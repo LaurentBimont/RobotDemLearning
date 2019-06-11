@@ -1,0 +1,16 @@
+Branche Caméra a le droit de toucher a:
+	Calibration
+	camera
+	fingertracking
+	gripper
+	RealSenseClass
+	robot
+
+Branche Master a le droit de toucher a:
+	def
+	divers
+	model
+	RewardManager
+	test
+	trainer
+

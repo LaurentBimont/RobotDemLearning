@@ -1,0 +1,190 @@
+#### Test Initial
+    test1 = False
+    if test1:
+        im = np.zeros((1, 224, 224, 3), np.float32)
+        im[:, 70:190, 100:105, :] = 1
+        im[:, 70:80, 80:125, :] = 1
+        result = Network.forward(im)
+        best_idx, best_value, image_idx, image_value = Network.get_best_predicted_primitive()
+        Network.vizualisation(im, image_idx)
+        result = tf.reshape(result, (result.shape[1], result.shape[2]))
+
+#### Test avec une seule image
+    test2 = False
+    if test2:
+        im = np.zeros((10, 224, 224, 3), np.float32)
+        im[:, 70:190, 100:105, :] = 1
+        im[:, 70:80, 80:125, :] = 1
+        previous_qmap = Network.forward(im)
+        label, label_weights = Network.compute_labels(1.8, best_pix)
+
+        print('Stacking in progress')
+        label, label_weights = tf.stack([label for i in range(10)]), tf.stack([label_weights for i in range(10)])
+
+        N = 10
+
+        for i in range(N):
+            print('Iteration {}/{}'.format(i, N-1))
+            Network.main_batches(im, label, label_weights)
+        trained_qmap = Network.forward(im)
+
+        # Creation of a rotated view
+        im2 = sc.ndimage.rotate(im[0, :, :, :], 90)
+        im2.reshape(1, im2.shape[0], im2.shape[1], im2.shape[2])
+        im2 = np.array([im2])
+
+        # Resizes images
+        new_qmap = Network.forward(im2)
+        trained_qmap = tf.image.resize_images(trained_qmap[0], (14, 14))
+        previous_qmap = tf.image.resize_images(previous_qmap[0], (14, 14))
+        new_qmap = tf.image.resize_images(new_qmap[0], (14, 14))
+        print(new_qmap.shape)
+
+        # Plotting
+        plt.subplot(1, 3, 3)
+        plt.imshow(tf.reshape(new_qmap, (14, 14)))
+        plt.subplot(1, 3, 1)
+        plt.imshow(tf.reshape(previous_qmap, (14, 14)))
+        plt.subplot(1, 3, 2)
+        plt.imshow(tf.reshape(trained_qmap, (14, 14)))
+        plt.show()
+
+#### Test avec Data Augmentation
+    test3 = False
+    if test3:
+        previous_qmap = Network.forward(im)
+
+        label, label_weights = Network.compute_labels(1.8, best_pix)
+        dataset = da.OnlineAugmentation().generate_batch(im, label, label_weights, viz=True)
+        Network.main_augmentation(dataset)
+
+        trained_qmap = Network.forward(im)
+
+        # Creation of a rotated view
+        im2 = sc.ndimage.rotate(im[0, :, :, :], 90)
+        im2.reshape(1, im2.shape[0], im2.shape[1], im2.shape[2])
+        im2 = np.array([im2])
+
+        # Resizes images
+        new_qmap = Network.forward(im2)
+        trained_qmap = tf.image.resize_images(trained_qmap, (Network.width, Network.height))
+        previous_qmap = tf.image.resize_images(previous_qmap, (Network.width, Network.height))
+        new_qmap = tf.image.resize_images(new_qmap, (Network.width, Network.height))
+        print(new_qmap.shape)
+
+        # Plotting
+        plt.subplot(1, 3, 3)
+        plt.imshow(tf.reshape(new_qmap, (Network.width, Network.height)))
+        plt.subplot(1, 3, 1)
+        plt.imshow(tf.reshape(previous_qmap, (Network.width, Network.height)))
+        plt.subplot(1, 3, 2)
+        plt.imshow(tf.reshape(trained_qmap, (Network.width, Network.height)))
+        plt.show()
+
+#### Test avec Data Augmentation et Batch
+    test4 = False
+    if test4:
+        previous_qmap = Network.forward(im)
+        label, label_weights = Network.compute_labels(1.8, best_pix)
+
+        dataset = da.OnlineAugmentation().generate_batch(im, label, label_weights, viz=False)
+
+        im_o, label_o, label_wo = dataset['im'], dataset['label'], dataset['label_weights']
+
+        plt.subplot(1, 3, 1)
+        plt.imshow(im_o[0])
+        plt.subplot(1, 3, 2)
+        plt.imshow(label_o[0])
+        plt.subplot(1, 3, 3)
+        plt.imshow(label_wo[0])
+        plt.show()
+
+        epoch_size = 1
+        batch_size = 8
+        for epoch in range(epoch_size):
+
+            for batch in range(len(dataset['im'])//batch_size):
+
+                print('Epoch {}/{}, Batch {}/{}'.format(epoch+1, epoch_size, batch+1, len(dataset['im'])//batch_size))
+                batch_tmp_im, batch_tmp_lab, batch_tmp_weights = [], [], []
+                for i in range(10):
+                    ind_tmp = np.random.randint(len(dataset['im']))
+                    batch_tmp_im.append(im_o[ind_tmp])
+                    batch_tmp_lab.append(label_o[ind_tmp])
+                    batch_tmp_weights.append(label_wo[ind_tmp])
+
+                batch_im, batch_lab, batch_weights = tf.stack(batch_tmp_im), tf.stack(batch_tmp_lab), tf.stack(batch_tmp_weights)
+
+                Network.main_batches(batch_im, batch_lab, batch_weights)
+
+        trained_qmap = Network.forward(im)
+
+        # Creation of a rotated view
+        im2 = sc.ndimage.rotate(im[0, :, :, :], 90)
+        im2.reshape(1, im2.shape[0], im2.shape[1], im2.shape[2])
+        im2 = np.array([im2])
+
+        # Resizes images
+        new_qmap = Network.forward(im2)
+        trained_qmap = tf.image.resize_images(trained_qmap, (Network.width, Network.height))
+        previous_qmap = tf.image.resize_images(previous_qmap, (Network.width, Network.height))
+        new_qmap = tf.image.resize_images(new_qmap, (Network.width, Network.height))
+
+        # Plotting
+        plt.subplot(2, 3, 3)
+        # plt.imshow(tf.reshape(new_qmap, (Network.width, Network.height)))
+        new_qmap = tf.image.resize_images(new_qmap, (224, 224))
+        plt.imshow(tf.reshape(new_qmap, (224, 224)))
+
+        plt.subplot(2, 3, 1)
+        # plt.imshow(tf.reshape(previous_qmap, (Network.width, Network.height)))
+        previous_qmap = tf.image.resize_images(previous_qmap, (224, 224))
+        plt.imshow(tf.reshape(previous_qmap, (224, 224)))
+
+        plt.subplot(2, 3, 2)
+        # plt.imshow(tf.reshape(trained_qmap, (Network.width, Network.height)))
+        trained_qmap = tf.image.resize_images(trained_qmap, (224, 224))
+        plt.imshow(tf.reshape(trained_qmap, (224, 224)))
+
+        plt.subplot(2, 3, 5)
+        plt.imshow(im[0, :, :, :])
+
+        plt.subplot(2, 3, 6)
+        plt.imshow(im2[0, :, :, :])
+
+        plt.show()
+
+    test5 = False
+    if test5:
+        previous_qmap = Network.forward(im)
+        label, label_weights = Network.compute_labels(1.8, best_pix)
+
+        dataset = da.OnlineAugmentation().generate_batch(im, label, label_weights, viz=False)
+
+        im_o, label_o, label_wo = dataset['im'], dataset['label'], dataset['label_weights']
+        epoch_size = 1
+        batch_size = 8
+        for epoch in range(epoch_size):
+
+            for batch in range(len(dataset['im']) // batch_size):
+
+                print('Epoch {}/{}, Batch {}/{}'.format(epoch + 1, epoch_size, batch + 1,
+                                                        len(dataset['im']) // batch_size))
+                batch_tmp_im, batch_tmp_lab, batch_tmp_weights = [], [], []
+                for i in range(10):
+                    ind_tmp = np.random.randint(len(dataset['im']))
+                    batch_tmp_im.append(im_o[ind_tmp])
+                    batch_tmp_lab.append(label_o[ind_tmp])
+                    batch_tmp_weights.append(label_wo[ind_tmp])
+
+                batch_im, batch_lab, batch_weights = tf.stack(batch_tmp_im), tf.stack(batch_tmp_lab), tf.stack(
+                    batch_tmp_weights)
+
+                Network.main_batches(batch_im, batch_lab, batch_weights)
+
+        trained_qmap = Network.forward(im)
+
+        ntrained_qmap = trained_qmap.numpy()
+
+        print(np.argmax(ntrained_qmap), np.argmax(ntrained_qmap[0]))
+
