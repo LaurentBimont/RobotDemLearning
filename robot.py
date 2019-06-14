@@ -1,37 +1,37 @@
 from iiwaPy.sunrisePy import sunrisePy
 import time
 import numpy as np
-# from gripper import RobotiqGripper
+from gripper import RobotiqGripper
 import matplotlib.pyplot as plt
-
 # TEST TEMPORAIRE POUR CREER LA FONCTION camera-->robot
 from camera import RealCamera
 
 class Robot:
     def __init__(self):
+
+        # Define CameraTransormation Matrix
+        self.camera = RealCamera()
+        self.Rmain_camera = np.load('calib/CalibrationRotation.npy')
+        self.Tmain_camera = np.load('calib/CalibrationTranslation.npy')
+
+        # Connection to gripper
+        self.grip = RobotiqGripper("/dev/ttyUSB0")
+        self.grip.reset()
+        self.grip.activate()
+        self.grip.closeGripper()
+
+        # Connection to robot
         ip = '172.31.1.148'
         self.iiwa = sunrisePy(ip)
-
         self.iiwa.setBlueOn()
-        # self.grip = RobotiqGripper("/dev/ttyUSB0")
-        # self.grip.reset()
-        # self.grip.activate()
+
         time.sleep(2)
         self.iiwa.setBlueOff()
         self.relVel = 0.1
         self.vel = 10
-
-        # Define Flange
-        # self.iiwa.attachToolToFlange([-1.5, 1.54, 152.8, 0, 0, 0])
-        # self.iiwa.attachToolToFlange([0., 0., 0., 0., 0., 0.])
-
-        # Define CameraTransormation Matrix
-        self.camera = RealCamera()
-        self.camera.start_pipe(usb3=False)
-        self.camera.get_frame()
-        self.camera.show()
-        self.Rmain_camera = np.load('calib/CalibrationRotation.npy')
-        self.Tmain_camera = np.load('calib/CalibrationTranslation.npy')
+        self.iiwa.attachToolToFlange([-1.5, 1.54, 252.8, 0, 0, 0])
+        self.z_min = -0.18      # Z table
+        self.z_min_mousse = 12.3
 
     def getCart(self):
         return self.iiwa.getEEFCartesianPosition()
@@ -147,19 +147,33 @@ class Robot:
         cartPos[3] -= np.pi/8
         self.iiwa.movePTPLineEEF(cartPos, vel, orientationVel=orientationVel)
 
-    def moveto(self):
+    def moveto(self, cart):
+        #cart[2] = max(cart[2], -18.64)
+        ## Only for angle test
+        OK='1'
+        while OK=='1':
+            angle = int(input('Rentrer l\'angle : '))
+            goto = [450, -2.13, 329, angle*np.pi/180, 0, np.pi]
+            speed = 20
+            self.iiwa.movePTPLineEEF(goto, speed, orientationVel=0.1)
+            OK = input('Continuer ? : ')
 
-        goto = [cart[0], cart[1], cart[2], 0, 0, -np.pi]
+    def home(self):
         speed = 20
+        home = [595, 15.9, 353, 1.60, 0, 2.77] # Orientation camera vers l'arrière
+        goto = [383, -2.13, 329, -1.63, 0, 2.72] # Orientation camera vers l'avant
         self.iiwa.movePTPLineEEF(goto, speed, orientationVel=0.1)
 
     def grasp(self, pos, ang, speed=40):
-        grasp_above = [pos[0], pos[1], pos[2]+100, ang, 0, -np.pi]
-        self.iiwa.movePTPLineEEF(grasp_above, speed)
-        grasp = [pos[0], pos[1], pos[2], ang, 0, -np.pi]
-        self.iiwa.movePTPLineEEF(grasp, speed)
+        pos[2] = max(pos[2], self.z_min_mousse)
+        grasp_above = [pos[0], pos[1], pos[2]+100., ang[0], ang[1], ang[2]]
+        self.iiwa.movePTPLineEEF(grasp_above, speed, orientationVel=0.1)
+        grasp = [pos[0], pos[1], pos[2], ang[0], ang[1], ang[2]]
+        self.iiwa.movePTPLineEEF(grasp, speed, orientationVel=0.1)
         self.grip.closeGripper()
         print(self.grip.isObjectDetected())
+        self.iiwa.movePTPLineEEF(grasp_above, speed, orientationVel=0.1)
+        self.iiwa.movePTPLineEEF(grasp, speed, orientationVel=0.1)
         self.grip.openGripper()
 
 def onclick(event):
@@ -168,25 +182,20 @@ def onclick(event):
     print(x_click, y_click)
 
 if __name__=="__main__":
-    rob = Robot()
-    rob.iiwa.attachToolToFlange([-1.5, 1.54, 252.8, 0, 0, 0])
-
-    cart = rob.from_camera2robot(rob.camera.depth_image, 241, 290)
-    cart[2] += 10
-    OK = input('Move à la position cartésienne : {}  Est-ce OK ?'.format(cart))
-    if OK == '1':
-        rob.moveto(cart)
-
     try:
-      checkTCP = False
-      if checkTCP:
-
-         rob.iiwa.attachToolToFlange([-1.5, 1.54, 252.8, 0, 0, 0])
-         rob.checkTCPJoint()
-
-      P1_robot = [68.15, 127.42, 738.48]
-      P2_robot = [-33.15, 166.57, 747.85]
-      P3_robot = [16.1, -18.2, 742.9]
-      rob.iiwa.close()
-    except:
+        rob = Robot()
+        print(rob.getCart())
+        # cart = rob.from_camera2robot(rob.camera.depth_image, 241, 290)
+        rob.moveto([[450, -2.13, 329]])
+        OK = input('Move à la position cartésienne : {}  Est-ce OK ? (oui : 1)'.format(cart))
+        cart = []
+        # rob.moveto(cart)
+        ang = [-1.5, 0., np.pi]
+        rob.grasp(cart, ang)
+        print('Position Cartésienne atteinte', rob.getCart())
+        rob.camera.stop_pipe()
+        rob.iiwa.close()
+    except Exception as e:
+        print(e)
+        rob.camera.stop_pipe()
         rob.iiwa.close()

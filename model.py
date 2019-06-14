@@ -18,11 +18,13 @@ class DensenetFeatModel(tf.keras.Model):
 
         super(DensenetFeatModel, self).__init__()
         baseModel = tf.keras.applications.densenet.DenseNet121(weights='imagenet')
+
         self.model = tf.keras.Model(inputs=baseModel.input, outputs=baseModel.get_layer(
             "conv5_block16_concat").output)
 
     def call(self, inputs):
         # inputs = tf.transpose(inputs,(0,3,2,1))
+        print(inputs.shape)
         output = self.model(inputs)
         return output
 

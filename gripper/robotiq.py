@@ -163,7 +163,6 @@ class RobotiqCGripper(RobotiqBaseCModel):
         cmd.rSP = int(np.clip(255./(0.1-0.013) * (vel-0.013), 0, 255))
         cmd.rFR = int(np.clip(255./(100.-30.) * (force-30.), 0, 255))
         self.send(cmd)
-
         return True
 
     def stop(self, block=False, timeout=-1):

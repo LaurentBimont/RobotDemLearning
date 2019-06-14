@@ -18,6 +18,7 @@ import scipy as sc
 import dataAugmentation as da
 import tfmpl                             # Put matplotlib figures in tensorboard
 import os
+from skimage.transform import resize
 
 class Trainer(object):
     def __init__(self, savetosnapshot=True, load=False, snapshot_file='name'):
@@ -156,7 +157,7 @@ class Trainer(object):
 
         return self.loss_value
 
-    def compute_labels(self, label_value, best_pix_ind, viz=False):
+    def compute_labels(self, label_value, best_pix_ind, shape=(224,224,3), viz=False):
         '''Create the targeted Q-map
         :param label_value: Reward of the action
         :param best_pix_ind: (Rectangle Parameters : x(colonne), y(ligne), angle(en degré), ecartement(en pixel)) Pixel where to perform the action
@@ -164,10 +165,11 @@ class Trainer(object):
                  label_weights : a 224x224 where best pix is at one
         '''
         # Compute labels
+        print(best_pix_ind)
         x, y, angle, e, lp = best_pix_ind[0], best_pix_ind[1], best_pix_ind[2], best_pix_ind[3], best_pix_ind[4]
         rect = div.draw_rectangle(e, angle, x, y, lp)
 
-        label = np.zeros((224, 224, 3), dtype=np.float32)
+        label = np.zeros(shape, dtype=np.float32)
         cv2.fillConvexPoly(label, rect, color=1)
         label *= label_value
 
@@ -342,7 +344,6 @@ class Trainer(object):
 
             tf.contrib.summary.image(name, im2)
 
-
     def log_scalar(self, name, data):
         with self.logger.as_default(), tf.contrib.summary.always_record_summaries():
             try:
@@ -356,6 +357,41 @@ class Trainer(object):
                 tf.contrib.summary.generic(name, data)
             except:
                 pass
+
+
+    def main(self, best_pix, im):
+        label, label_weights = self.compute_labels(1, best_pix, shape=im.shape)
+        plt.subplot(1, 2, 1)
+        plt.imshow(label)
+        plt.subplot(1, 2, 2)
+        plt.imshow(im)
+        plt.show()
+
+        im = resize(im, (224, 224, 3), anti_aliasing=True)
+        label, label_weights = resize(label, (224, 224, 3), anti_aliasing=True), resize(label_weights, (224, 224, 3), anti_aliasing=True)
+
+        dataset = da.OnlineAugmentation().generate_batch(im, label, label_weights, viz=False, augmentation_factor=4)
+        im_o, label_o, label_wo = dataset['im'], dataset['label'], dataset['label_weights']
+        epoch_size = 1
+        batch_size = 1
+        print('ici')
+        for epoch in range(epoch_size):
+            print('la')
+            for batch in range(len(dataset['im']) // batch_size):
+                print('Epoch {}/{}, Batch {}/{}'.format(epoch + 1, epoch_size, batch + 1,
+                                                        len(dataset['im']) // batch_size))
+                batch_tmp_im, batch_tmp_lab, batch_tmp_weights = [], [], []
+                for i in range(batch_size):
+                    ind_tmp = np.random.randint(len(dataset['im']))
+                    batch_tmp_im.append(im_o[ind_tmp])
+                    batch_tmp_lab.append(label_o[ind_tmp])
+                    batch_tmp_weights.append(label_wo[ind_tmp])
+
+                batch_im, batch_lab, batch_weights = tf.stack(batch_tmp_im), tf.stack(batch_tmp_lab), tf.stack(
+                    batch_tmp_weights)
+
+                self.main_batches(batch_im, batch_lab, batch_weights)
+
 
 if __name__=='__main__':
     Network = Trainer(savetosnapshot=True, snapshot_file='reference')

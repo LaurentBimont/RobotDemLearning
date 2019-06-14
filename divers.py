@@ -1,6 +1,7 @@
 import tensorflow as tf
 import numpy as np
 import matplotlib.pyplot as plt
+from sklearn.decomposition import PCA
 
 def draw_rectangle(e, theta, x0, y0, lp):
     #x1, y1, lx, ly, theta = params[0], params[1], params[2], params[3], params[4]
@@ -41,11 +42,33 @@ def py_ang(v1, v2):
     else:
         return np.arctan2(sinang, cosang)
 
+def angle2robotangle(angle):
+    if angle > 90:
+        angle -= 180
+    elif angle < -90:
+        angle += 180
+    angle -= 180
+    return angle
 
+def preprocess_depth_img(depth_image):
+    min = second_min(depth_image.flatten())
+    depth_image = np.ones(depth_image.shape) - (depth_image - min) / (depth_image.max() - min)
+    depth_image[depth_image > 1] = 0
+    depth_image = (depth_image * 255).astype('uint8')
+    depth_image = np.asarray(np.dstack((depth_image, depth_image, depth_image)), dtype=np.uint8)
+    return depth_image
 
-def rotate_image2( input_data, input_angles):
+def second_min(vector):
+    A = sorted(vector)
+    print(len(vector))
+    for i in range(len(vector)):
+        if A[i] != 0:
+            print(A[i], i)
+            return A[i]
+    return 0
+
+def rotate_image2(input_data, input_angles):
     return tf.contrib.image.rotate(input_data, input_angles, interpolation="BILINEAR")
-
 
 def preprocess_img(img, target_height=224*5, target_width=224*5, rotate=False):
     # Apply 2x scale to input heightmaps
@@ -67,7 +90,6 @@ def preprocess_img(img, target_height=224*5, target_width=224*5, rotate=False):
 
     return resized_img
 
-
 def postprocess_img( imgs, list_angles):
     # Return Q values (and remove extra padding
     # Reshape to standard
@@ -77,3 +99,22 @@ def postprocess_img( imgs, list_angles):
     # Reshape rotated images
     resized_imgs = tf.image.resize_images(rimgs, (320, 320))
     return resized_imgs
+
+def postprocess_pred(out):
+    out[out < 0] = 0
+    zoom_pixel = 30
+
+    (y_max, x_max) = np.unravel_index(out[:, :, 1].argmax(), out[:, :, 1].shape)
+    test_pca = out[y_max-zoom_pixel:y_max+zoom_pixel, x_max-zoom_pixel:x_max+zoom_pixel, 1]
+    PointCloud = heatmap2pointcloud(test_pca)
+    pca = PCA()
+    pca.fit(PointCloud)
+    vectors = pca.components_
+    sing_val = pca.singular_values_/np.linalg.norm(pca.singular_values_)
+    vectors[0] *= sing_val[0]
+    vectors[1] *= sing_val[1]
+    np.linalg.norm(pca.singular_values_)
+    origin = [zoom_pixel], [zoom_pixel]
+    e = 30
+    theta = py_ang([1, 0], vectors[0])*180/np.pi
+    return x_max, y_max, theta, e

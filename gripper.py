@@ -63,7 +63,7 @@ class RobotiqGripper(mm.Instrument):
             Address of the gripper (integer) usually 9.
         """
         mm.Instrument.__init__(self, portname, slaveaddress=9)
-        self.debug = True
+        self.debug = False
         self.mode = mm.MODE_RTU
 
         self.processing = False
@@ -556,7 +556,7 @@ class RobotiqGripper(mm.Instrument):
 
 
 # Test
-if True:
+if __name__== "__main__":
     grip = RobotiqGripper("/dev/ttyUSB0")
     # grip.resetActivate()
     grip.reset()

@@ -1,7 +1,7 @@
 import numpy as np
 import pyrealsense2 as rs
 import matplotlib.pyplot as plt
-
+import time
 # Rq : realsense display images in rgb
 
 
@@ -16,38 +16,54 @@ class RealCamera:
         self.color_image = None
         self.depth_image = None
 
-
     def start_pipe(self, align=True, usb3=True):
         if not self.pipelineStarted:
-
+            print('Caméra Ouverte')
             if align:
                 # Create a config and configure the pipeline to stream
                 #  different resolutions of color and depth streams
-                config = rs.config()
-                # if usb3:
-                #     print(2)
-                #     config.enable_stream(rs.stream.depth, 640, 360, rs.format.z16, 30)
-                #     config.enable_stream(rs.stream.color, 640, 480, rs.format.rgb8, 30)
-
                 self.pipeline = rs.pipeline()
-                self.config = rs.config()
-                self.profile = config.resolve(self.pipeline)  # does not start streaming
 
+                # Create a config and configure the pipeline to stream
+                #  different resolutions of color and depth streams
+                config = rs.config()
+                config.enable_stream(rs.stream.depth, 640, 480, rs.format.z16, 30)
+                config.enable_stream(rs.stream.color, 640, 480, rs.format.bgr8, 30)
+
+                # Start streaming
                 self.profile = self.pipeline.start(config)
-                self.pipelineStarted = True
-                # Align the two streams
+
                 align_to = rs.stream.color
                 self.align = rs.align(align_to)
 
+                time.sleep(1)
+
+                # self.pipeline = rs.pipeline()
+                # config = rs.config()
+                #
+                # if usb3:
+                #     config.enable_stream(rs.stream.depth, 640, 360, rs.format.z16, 30)
+                #     config.enable_stream(rs.stream.color, 640, 480, rs.format.rgb8, 30)
+                #
+                # else:
+                #     self.profile = config.resolve(self.pipeline)  # does not start streaming
+                #
+                # self.profile = self.pipeline.start(config)
+                # self.pipelineStarted = True
+                # # Align the two streams
+                # align_to = rs.stream.color
+                # self.align = rs.align(align_to)
+                self.pipelineStarted = True
                 # Get depth scale
                 depth_sensor = self.profile.get_device().first_depth_sensor()
                 self.depth_scale = depth_sensor.get_depth_scale()
 
                 # Get Intrinsic parameters
-                self.get_intrinsic()
+                # self.get_intrinsic()
 
     def stop_pipe(self):
         if self.pipelineStarted:
+            print('Camera Fermée')
             self.pipeline.stop()
             self.pipelineStarted = False
 
@@ -102,7 +118,8 @@ class RealCamera:
             fx, fy, Cx, Cy = self.intr.fx, self.intr.fy, self.intr.ppx, self.intr.ppy
         else:
             depth_scale = self.depth_scale
-            fx, fy, Cx, Cy = param[0], param[1],self.intr.ppx, self.intr.ppy
+            fx, fy, Cx, Cy = param[0], param[1], self.intr.ppx, self.intr.ppy
+        print('Les paramètres intrinsèques :', fx, fy, Cx, Cy)
         z = d / depth_scale
         # print('Cy : {} ; Cx : {} ; image dimension {}'.format(Cy, Cx, self.depth_image.shape))
         y = (u - Cy) * z / fy
