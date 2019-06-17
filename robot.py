@@ -3,6 +3,9 @@ import time
 import numpy as np
 from gripper import RobotiqGripper
 import matplotlib.pyplot as plt
+import divers as div
+import sys, os
+import traceback
 # TEST TEMPORAIRE POUR CREER LA FONCTION camera-->robot
 from camera import RealCamera
 
@@ -30,16 +33,17 @@ class Robot:
         self.relVel = 0.1
         self.vel = 10
         self.iiwa.attachToolToFlange([-1.5, 1.54, 252.8, 0, 0, 0])
-        self.z_min = -0.18      # Z table
-        self.z_min_mousse = 12.3
+        self.z_min = 12.3       # Z mousse
+        self.z_min = -18      # Z table
 
     def getCart(self):
         return self.iiwa.getEEFCartesianPosition()
 
-    def manual_click(self):
+    def manual_click(self, depth_img):
         fig = plt.figure()
         connection_id = fig.canvas.mpl_connect('button_press_event', onclick)
-        plt.imshow(self.camera.color_image)
+        print(depth_img.shape, type(depth_img))
+        plt.imshow(depth_img)
         plt.show()
         while True:
             try:
@@ -105,7 +109,7 @@ class Robot:
         camera = self.camera.transform_3D(u, v, depth_img)
         return np.transpose(camera)
 
-    def from_camera2robot(self, depth_img, u, v, cartpos=None, test_manuel=True):
+    def from_camera2robot(self, depth_img, u, v, color=None, camera_param=None, cartpos=None, test_manuel=False):
         '''
         Transform from camera coordinates to robot coordinates
         :param camera: Coordonnées dans le repère caméra (shape : (3, 1) np.array([[x],[y],[z]]))
@@ -113,12 +117,18 @@ class Robot:
         :return:
         '''
         if test_manuel:
-            u, v = self.manual_click()
-        camera = self.camera.transform_3D(u, v, self.camera.depth_image)
+            if color is None:
+                u, v = self.manual_click(depth_img)
+            else:
+                u, v = self.manual_click(color)
+        second_min = div.second_min(depth_img.flatten())
+        depth_img[depth_img==0.] = second_min
+        camera = self.camera.transform_3D(u, v, depth_img, param=camera_param)
         camera = camera.reshape(3, 1)
         print('camera size : {}'.format(camera.shape), camera, np.transpose(camera).shape)
         if cartpos is None:
-            cartpos = rob.getCart()
+            cartpos = self.getCart()
+            print(cartpos)
         Base_main = self.camera2main(np.transpose(camera), self.Rmain_camera, self.Tmain_camera)
         R, T = self.get_rotation_translation(cartpos)
         Base_robot = self.fromAtoB(Base_main, np.transpose(R), -T, changeT=False)
@@ -154,27 +164,37 @@ class Robot:
         while OK=='1':
             angle = int(input('Rentrer l\'angle : '))
             goto = [450, -2.13, 329, angle*np.pi/180, 0, np.pi]
+            goto = [cart[0], cart[1], cart[2], angle*np.pi/180, 0, np.pi]
             speed = 20
             self.iiwa.movePTPLineEEF(goto, speed, orientationVel=0.1)
             OK = input('Continuer ? : ')
 
     def home(self):
-        speed = 20
+        speed = 100
         home = [595, 15.9, 353, 1.60, 0, 2.77] # Orientation camera vers l'arrière
-        goto = [383, -2.13, 329, -1.63, 0, 2.72] # Orientation camera vers l'avant
-        self.iiwa.movePTPLineEEF(goto, speed, orientationVel=0.1)
+        goto = [383, -2.13, 250, -1.63, 0, 2.72] # Orientation camera vers l'avant
+        angular_home = [0.19611477, 0.430804, -0.30726947, -1.47291056, 0.10567891, 1.67921869, -1.63443118]
+        self.iiwa.movePTPJointSpace(angular_home, 0.50)
+        # self.iiwa.movePTPLineEEF(goto, speed, orientationVel=0.5)
 
-    def grasp(self, pos, ang, speed=40):
-        pos[2] = max(pos[2], self.z_min_mousse)
-        grasp_above = [pos[0], pos[1], pos[2]+100., ang[0], ang[1], ang[2]]
-        self.iiwa.movePTPLineEEF(grasp_above, speed, orientationVel=0.1)
-        grasp = [pos[0], pos[1], pos[2], ang[0], ang[1], ang[2]]
+
+    def grasp(self, pos, ang, speed=50):
+        angle = div.angle2robotangle(ang)*np.pi/180
+        pos[2] = max(pos[2]-60, self.z_min)
+        print(pos[2], self.z_min)
+        pos[0] += 14
+        pos[1] -= 31.7
+        grasp_above = [pos[0], pos[1], pos[2]+100., angle, 0, np.pi]
+        print('Grasp Above {}'.format(grasp_above))
+        self.iiwa.movePTPLineEEF(grasp_above, speed, orientationVel=0.3)
+        self.grip.openGripper()
+        grasp = [pos[0], pos[1], pos[2], angle, 0, np.pi]
         self.iiwa.movePTPLineEEF(grasp, speed, orientationVel=0.1)
         self.grip.closeGripper()
-        print(self.grip.isObjectDetected())
-        self.iiwa.movePTPLineEEF(grasp_above, speed, orientationVel=0.1)
-        self.iiwa.movePTPLineEEF(grasp, speed, orientationVel=0.1)
+        time.sleep(2)
+        print('Objet Détectée', self.grip.isObjectDetected())
         self.grip.openGripper()
+        self.home()
 
 def onclick(event):
     global x_click, y_click
@@ -182,20 +202,33 @@ def onclick(event):
     print(x_click, y_click)
 
 if __name__=="__main__":
+    rob = Robot()
+    print(rob.getCart())
+
     try:
+        camera = RealCamera()
+        camera.start_pipe()
+        camera_param = [camera.intr.fx, camera.intr.fy, camera.intr.ppx, camera.intr.ppy, camera.depth_scale]
+        camera.get_frame()
+        print(camera.color_image)
         rob = Robot()
         print(rob.getCart())
-        # cart = rob.from_camera2robot(rob.camera.depth_image, 241, 290)
-        rob.moveto([[450, -2.13, 329]])
+        rob.home()
+        print('Joint Position', rob.iiwa.getJointsPos())
+        cart = rob.from_camera2robot(camera.depth_image, 241, 290, color=camera.color_image, camera_param=camera_param, test_manuel=True)
+        # rob.moveto([[450, -2.13, 329]])
         OK = input('Move à la position cartésienne : {}  Est-ce OK ? (oui : 1)'.format(cart))
-        cart = []
-        # rob.moveto(cart)
+        rob.moveto(cart)
         ang = [-1.5, 0., np.pi]
         rob.grasp(cart, ang)
         print('Position Cartésienne atteinte', rob.getCart())
         rob.camera.stop_pipe()
         rob.iiwa.close()
     except Exception as e:
+        exc_info = sys.exc_info()
         print(e)
         rob.camera.stop_pipe()
         rob.iiwa.close()
+    finally:
+        traceback.print_exception(*exc_info)
+        del exc_info

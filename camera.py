@@ -59,7 +59,7 @@ class RealCamera:
                 self.depth_scale = depth_sensor.get_depth_scale()
 
                 # Get Intrinsic parameters
-                # self.get_intrinsic()
+                self.get_intrinsic()
 
     def stop_pipe(self):
         if self.pipelineStarted:
@@ -117,8 +117,7 @@ class RealCamera:
             depth_scale = self.depth_scale
             fx, fy, Cx, Cy = self.intr.fx, self.intr.fy, self.intr.ppx, self.intr.ppy
         else:
-            depth_scale = self.depth_scale
-            fx, fy, Cx, Cy = param[0], param[1], self.intr.ppx, self.intr.ppy
+            fx, fy, Cx, Cy, depth_scale = param
         print('Les paramètres intrinsèques :', fx, fy, Cx, Cy)
         z = d / depth_scale
         # print('Cy : {} ; Cx : {} ; image dimension {}'.format(Cy, Cx, self.depth_image.shape))

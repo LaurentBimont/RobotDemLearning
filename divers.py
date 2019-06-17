@@ -44,16 +44,28 @@ def py_ang(v1, v2):
 
 def angle2robotangle(angle):
     if angle > 90:
+        print(1)
         angle -= 180
     elif angle < -90:
+        print(2)
         angle += 180
     angle -= 180
+
     return angle
 
 def preprocess_depth_img(depth_image):
+    depth_image[depth_image > 0.6] = 0
     min = second_min(depth_image.flatten())
+    print('Le deuxième minimum est ', min)
+    plt.subplot(1, 3, 1)
+    plt.imshow(depth_image)
     depth_image = np.ones(depth_image.shape) - (depth_image - min) / (depth_image.max() - min)
+    plt.subplot(1, 3, 2)
+    plt.imshow(depth_image)
     depth_image[depth_image > 1] = 0
+    plt.subplot(1, 3, 3)
+    plt.imshow(depth_image)
+    plt.show()
     depth_image = (depth_image * 255).astype('uint8')
     depth_image = np.asarray(np.dstack((depth_image, depth_image, depth_image)), dtype=np.uint8)
     return depth_image
@@ -73,21 +85,7 @@ def rotate_image2(input_data, input_angles):
 def preprocess_img(img, target_height=224*5, target_width=224*5, rotate=False):
     # Apply 2x scale to input heightmaps
     resized_img = tf.image.resize_images(img, (target_height, target_width))
-
     # Peut être rajouter un padding pour éviter les effets de bords
-
-    if rotate:
-        rimgs = rotate_image2(resized_imgs, list_angles)
-
-        # Add extra padding (to handle rotations inside network)
-        diag_length = float(target_height) * np.sqrt(2)
-        diag_length = np.ceil(diag_length/32)*32
-        padding_width = int((diag_length - target_height))
-
-        padded_imgs = tf.image.resize_image_with_crop_or_pad(rimgs,target_height+padding_width,target_width+padding_width)
-
-        return padded_imgs, padding_width
-
     return resized_img
 
 def postprocess_img( imgs, list_angles):
@@ -102,8 +100,9 @@ def postprocess_img( imgs, list_angles):
 
 def postprocess_pred(out):
     out[out < 0] = 0
-    zoom_pixel = 30
-
+    zoom_pixel = 60
+    plt.imshow(out)
+    plt.show()
     (y_max, x_max) = np.unravel_index(out[:, :, 1].argmax(), out[:, :, 1].shape)
     test_pca = out[y_max-zoom_pixel:y_max+zoom_pixel, x_max-zoom_pixel:x_max+zoom_pixel, 1]
     PointCloud = heatmap2pointcloud(test_pca)

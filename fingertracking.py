@@ -224,7 +224,7 @@ class FingerTracker(object):
         #     vectors = np.array([np.cos(angle * np.pi / 180), np.sin(angle * np.pi / 180)])
         #     plt.quiver(*origin, vectors[0], vectors[1], scale=13)
         #     plt.show()
-        x, y, angle, e = 217, 184, -90, 20
+        x, y, angle, e = 327, 252, -90, 40
         self.cam.stop_pipe()
         return x, y, angle, e, 2*e, depth_without_hand, frame_without_hand
 

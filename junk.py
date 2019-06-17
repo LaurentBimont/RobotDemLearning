@@ -262,3 +262,44 @@ PA = np.array([1, 0, 0])
 # T est exprimé dans la base de départ
 print(fromAtoB(PA, R, np.array([6, 1, 0])))
 
+## trainer.py
+
+def main_augmentation(self, dataset):
+    ima, val, val_w = dataset['im'], dataset['label'], dataset['label_weights']
+    self.future_reward = 1
+    for j in range(len(ima)):
+        if j % 10 == 0:
+            print('Iteration {}/{}'.format(j, len(ima)))
+        with tf.GradientTape() as tape:
+            self.forward(tf.reshape(ima[j], (1, 224, 224, 3)))
+            self.compute_loss_dem(val[j], val_w[j])
+            grad = tape.gradient(self.loss_value, self.myModel.trainable_variables)
+            self.optimizer.apply_gradients(zip(grad, self.myModel.trainable_variables),
+                                           global_step=tf.train.get_or_create_global_step())
+
+
+def main(self, input):
+    self.future_reward = 1
+    with tf.GradientTape() as tape:
+        self.forward(input)
+        self.compute_loss()
+        grad = tape.gradient(self.loss_value, self.myModel.trainable_variables)
+        self.optimizer.apply_gradients(zip(grad, self.myModel.trainable_variables),
+                                       global_step=tf.train.get_or_create_global_step())
+
+def output_viz(self, output_prob):
+    output_viz = np.clip(output_prob, 0, 1)
+    output_viz = cv2.applyColorMap((output_viz*255).astype(np.uint8), cv2.COLORMAP_JET)
+    output_viz = cv2.cvtColor(output_viz, cv2.COLOR_BGR2RGB)
+    return np.array([output_viz])
+
+
+def compute_loss(self):
+    # A changer pour pouvoir un mode démonstration et un mode renforcement
+    expected_reward, action_reward = self.action.compute_reward(self.action.grasp, self.future_reward)
+    label224, label_weights224 = self.compute_labels(expected_reward, self.best_idx)
+    label, label_weights = self.reduced_label(label224, label_weights224)
+    self.output_prob = tf.reshape(self.output_prob, (self.width, self.height, 1))
+    self.loss_value = self.loss(label, self.output_prob, label_weights)
+    return self.loss_value
+
