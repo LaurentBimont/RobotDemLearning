@@ -36,7 +36,7 @@ class Trainer(object):
         self.classifier_boolean = True
         self.savetosnapshot = savetosnapshot
         # self.create_log()
-        self.exp_rpl = ExperienceReplay(self,["depth_heightmap","label","best_idx","loss"]) 
+        self.exp_rpl = ExperienceReplay(self,["depth_heightmap","label","loss"]) 
         # Frequency
         self.viz_frequency = 100
         self.saving_frequency = 50
@@ -263,7 +263,7 @@ class Trainer(object):
         dataset = da.OnlineAugmentation().generate_batch(im, label, viz=False, augmentation_factor=4)
         im_o, label_o = dataset['im'], dataset['label']
         epoch_size = 1
-        batch_size = 1
+        batch_size =1  
         print('ici')
         for epoch in range(epoch_size):
             print('la')
