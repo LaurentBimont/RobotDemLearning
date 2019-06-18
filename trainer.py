@@ -19,7 +19,7 @@ import dataAugmentation as da
 import tfmpl                             # Put matplotlib figures in tensorboard
 import os
 from skimage.transform import resize
-
+from experienceReplay import ExperienceReplay
 class Trainer(object):
     def __init__(self, savetosnapshot=True, load=False, snapshot_file='name'):
         super(Trainer, self).__init__()
@@ -36,11 +36,11 @@ class Trainer(object):
         self.classifier_boolean = True
         self.savetosnapshot = savetosnapshot
         # self.create_log()
-
+        self.exp_rpl = ExperienceReplay(self,["depth_heightmap","label","best_idx","loss"]) 
         # Frequency
         self.viz_frequency = 100
         self.saving_frequency = 50
-
+        
         # Initiate logger
         self.create_log()
 
@@ -150,13 +150,17 @@ class Trainer(object):
 
     def main_batches(self, im, label):
         self.future_reward = 1
-        with tf.GradientTape() as tape:
+        with tf.GradientTape(watch_accessed_variables=False) as tape:
+            tape.watch(self.myModel.trainable_variables)
             self.forward(im)
             self.compute_loss_dem(label)
+
             grad = tape.gradient(self.loss_value, self.myModel.trainable_variables)
             self.optimizer.apply_gradients(zip(grad, self.myModel.trainable_variables),
                                            global_step=tf.train.get_or_create_global_step())
             self.iteration = tf.train.get_global_step()
+
+        self.exp_rpl.store([im , label, self.loss_value])
 
     def vizualisation(self, img, idx):
         prediction = cv2.circle(img[0], (int(idx[1]), int(idx[0])), 7, (255, 255, 255), 2)
@@ -273,7 +277,7 @@ class Trainer(object):
                     batch_tmp_lab.append(label_o[ind_tmp])
                 batch_im, batch_lab,  = tf.stack(batch_tmp_im), tf.stack(batch_tmp_lab),
                 self.main_batches(batch_im, batch_lab)
-
+        self.exp_rpl.replay() 
 if __name__=='__main__':
     Network = Trainer(savetosnapshot=False, snapshot_file='reference')
     im = np.zeros((224, 224, 3), np.float32)
