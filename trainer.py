@@ -87,7 +87,6 @@ class Trainer(object):
 
     def compute_loss_dem(self, label):
         expected_reward, action_reward = self.action.compute_reward(self.action.grasp, self.future_reward)
-
         label = self.reduced_label(label)
         self.loss_value = self.loss(label, self.output_prob)
 
@@ -277,6 +276,7 @@ class Trainer(object):
                     batch_tmp_lab.append(label_o[ind_tmp])
                 batch_im, batch_lab,  = tf.stack(batch_tmp_im), tf.stack(batch_tmp_lab),
                 self.main_batches(batch_im, batch_lab)
+
         self.exp_rpl.replay() 
 if __name__=='__main__':
     Network = Trainer(savetosnapshot=False, snapshot_file='reference')
