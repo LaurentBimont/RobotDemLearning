@@ -2,20 +2,21 @@ import numpy as np
 import pandas as pd
 import tensorflow as tf 
 class ExperienceReplay:
-    def __init__(self,trainer,dataNames):
+    def __init__(self, trainer, dataNames):
         self.header = dataNames
         self.replay_buffer = [] 
         self.trainer = trainer
-    def store(self,data):
-        if len(self.header) !=  len(data):
+
+    def store(self, data):
+        if len(self.header) != len(data):
             raise ValueError("wrong number of stored data {} expected vs {}".format(len(self.header), len(data)))
         self.replay_buffer.append(data)
 
     def replay(self):
-        if len(self.replay_buffer)>2:
+        if len(self.replay_buffer) > 2:
             print("experience replay {} experience are stored in buffer ".format(len(self.replay_buffer)))
             data = pd.DataFrame(self.replay_buffer, columns=self.header)
-            if len(data)==0:
+            if len(data) == 0:
                 return
 
             # We sort the buffer by increasing loss 
@@ -23,7 +24,7 @@ class ExperienceReplay:
             data = data.sort_values("loss")
             
             if len(data) > 1000:
-                data=data.iloc[-1000:]
+                data = data.iloc[-1000:]
 
             pow_law_exp = 2
 
