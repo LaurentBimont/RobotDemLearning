@@ -303,3 +303,62 @@ def compute_loss(self):
     self.loss_value = self.loss(label, self.output_prob, label_weights)
     return self.loss_value
 
+
+def backpropagation(self, gradient):
+    self.optimizer.apply_gradients(zip(gradient, self.myModel.trainable_variables),
+                                   global_step=tf.train.get_or_create_global_step())
+    self.iteration = tf.train.get_global_step()
+
+
+## Finger Tracking
+def createHistogram(self):
+    t0 = time.time()
+    width = 50
+    while (time.time() - t0)<5:
+        _, frame = self.cam.get_frame()
+        rows, cols, _ = frame.shape
+        y0, x0 = int(0.5 * rows), int(0.2 * cols)
+        frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+        cv2.rectangle(frame, (x0, y0), (x0+width, y0+width), (255,0,0), 2)
+        cv2.imshow('frame', frame)
+
+        k = cv2.waitKey(5) & 0xFF
+        if k == 27:
+            break
+    cv2.destroyAllWindows()
+
+    rows, cols, _ = frame.shape
+    hsvFrame = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+    roi = np.zeros([width, width], dtype=hsvFrame.dtype)
+    y0, x0 = int(0.5 * rows), int(0.2 * cols)
+    roi = hsvFrame[y0:y0 + width, x0:x0 + width]
+    hist = cv2.calcHist([roi], [0, 1], None, [180, 256], [0, 180, 0, 256])
+    return cv2.normalize(hist, hist, 0, 255, cv2.NORM_MINMAX)
+
+def histMasking(self, frame, hist):
+    hsv = cv2.cvtColor(frame, cv2.COLOR_RGB2HSV)
+    dst = cv2.calcBackProject([hsv], [0, 1], hist, [0, 180, 0, 256], 1)
+
+    disc = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (31, 31))
+    cv2.filter2D(dst, -1, disc, dst)
+
+    ret, thresh = cv2.threshold(dst, 200, 255, cv2.THRESH_BINARY)
+    kernel = np.ones((5, 5), np.uint8)
+    # thresh = cv2.dilate(thresh, kernel, iterations=5)
+    # Erode : Only if all pixel under mask are 1
+    # Dilate : If at least one pixel under mask is 1
+    # Opening : Erosion then Dilatation
+    # Closing : Dilatation then Erosion
+
+    thresh = cv2.erode(thresh, kernel, iterations=5)
+    thresh = cv2.morphologyEx(thresh, cv2.MORPH_CLOSE, kernel, iterations=5)
+    thresh = cv2.morphologyEx(thresh, cv2.MORPH_OPEN, kernel)
+    thresh = cv2.merge((thresh, thresh, thresh))
+    return cv2.bitwise_and(frame, thresh)
+
+
+# A mettre dans div
+def get_angle(self, fingers):
+    u1, v1, u2, v2 = fingers[0], fingers[1], fingers[2], fingers[3]
+    angle = 180/np.pi * div.py_ang(np.array([u1-u2, v1-v2]), np.array([1, 0]))
+    return(angle - 90)

@@ -38,7 +38,7 @@ class Trainer(object):
         # self.create_log()
         self.exp_rpl = ExperienceReplay(self,["depth_heightmap","label","loss"]) 
         # Frequency
-        self.viz_frequency = 100
+        self.viz_frequency = 20
         self.saving_frequency = 50
         
         # Initiate logger
@@ -76,22 +76,32 @@ class Trainer(object):
         # Pass input data through model
         self.output_prob = self.myModel(input)
         self.batch, self.width, self.height = self.output_prob.shape[0], self.output_prob.shape[1], self.output_prob.shape[2]
-        print('Output : ', self.width, self.height)
         # Return Q-map
         return self.output_prob
 
-    def backpropagation(self, gradient):
-        self.optimizer.apply_gradients(zip(gradient, self.myModel.trainable_variables),
-                                       global_step=tf.train.get_or_create_global_step())
-        self.iteration = tf.train.get_global_step()
-
-    def compute_loss_dem(self, label):
-        expected_reward, action_reward = self.action.compute_reward(self.action.grasp, self.future_reward)
+    def compute_loss_dem(self, label, noBackprop=False):
+        # expected_reward, action_reward = self.action.compute_reward(self.action.grasp, self.future_reward)
         label = self.reduced_label(label)
-        self.loss_value = self.loss(label, self.output_prob)
 
+        new_lab, label_numpy = self.output_prob.numpy(), label.numpy()
+        new_lab[label_numpy == 1] = 1
+        new_lab[label_numpy == -1] = 0
+        new_lab[label_numpy != 1] /= 2
+        label = tf.convert_to_tensor(new_lab)
+        # print(new_lab[0,:,:,:].shape, self.output_prob[0,:,:,:].shape)
+
+        # plt.subplot(1, 2, 1)
+        # plt.imshow(new_lab[0, :, :, 0], vmin=0, vmax=1)
+        # plt.subplot(1, 2, 2)
+        # plt.imshow(self.output_prob[0, :, :, 0], vmin=0, vmax=1)
+        # plt.show()
+        # self.loss_value = self.loss(label, self.output_prob, reduction=tf.losses.Reduction.SUM)
+        self.loss_value = self.loss(label, self.output_prob)
+        # print('La valeur de perte est {}'.format(self.loss_value.numpy()))
         # Tensorboard ouputs
+
         if (tf.train.get_global_step() is not None) and (tf.train.get_global_step().numpy()%self.viz_frequency == 0):
+            print('Printing to Tensorboard')
             img_tensorboard = self.prediction_viz(3*self.output_prob, self.image)
             img_tensorboard_target = self.prediction_viz(label.numpy(), self.image)
             subplot_viz = self.draw_scatter_subplot(img_tensorboard, img_tensorboard_target)
@@ -100,7 +110,10 @@ class Trainer(object):
             self.log_scalar('loss value_dem', self.loss_value)
             output_prob_plt = self.draw_scatter(self.output_prob[0])
         # Saving a snapshot file
-        if (self.savetosnapshot) and (tf.train.get_global_step() is not None) and (tf.train.get_global_step().numpy()%self.saving_frequency == 0):
+        if (self.savetosnapshot) and\
+                (tf.train.get_global_step() is not None) and \
+                (tf.train.get_global_step().numpy()%self.saving_frequency == 0) and\
+                (not noBackprop):
             self.save_model()
         return self.loss_value
 
@@ -118,9 +131,6 @@ class Trainer(object):
         cv2.fillConvexPoly(label, rect, color=1)
 
         label *= label_value
-        plt.imshow(label)
-        plt.show()
-        print(label.shape)
         if viz:
             plt.subplot(1, 3, 1)
             self.image = np.reshape(self.image, (self.image.shape[1], self.image.shape[2], 3))
@@ -159,8 +169,66 @@ class Trainer(object):
                                            global_step=tf.train.get_or_create_global_step())
             self.iteration = tf.train.get_global_step()
 
-        self.exp_rpl.store([im , label, self.loss_value])
+        self.exp_rpl.store([im, label, self.loss_value])
 
+    def main_without_backprop(self, im, best_pix, batch_size=1, augmentation_factor=4):
+        label = self.compute_labels(1, best_pix, shape=im.shape)
+        im = resize(im, (224, 224, 3), anti_aliasing=True)
+        label = resize(label, (224, 224, 3), anti_aliasing=True)
+        print(type(im), type(label), im.shape, label.shape)
+        plt.subplot(1, 2, 1)
+        plt.imshow(im[:, :, 0])
+        plt.subplot(1, 2, 2)
+        plt.imshow(label[:, :, 0])
+        plt.show()
+        dataset = da.OnlineAugmentation().generate_batch(im, label, viz=False, augmentation_factor=augmentation_factor)
+
+        for batch in range(len(dataset['im'])//batch_size):
+            batch_im, batch_label = self.random_batch(batch_size, dataset)
+            self.forward(batch_im)
+            self.compute_loss_dem(batch_label, noBackprop=True)
+            self.exp_rpl.store([batch_im, batch_label, self.loss_value])
+            if batch % 20 == 0:
+                print('{}/{}'.format(batch, len(dataset['im'])//batch_size))
+
+    def main_xpreplay(self, nb_epoch=2, batch_size=3):
+        for epoch in range(nb_epoch):
+            for batch in range(100):
+                print('Epoch {}/{}, Batch {}/{}'.format(epoch + 1, nb_epoch, batch + 1, 100))
+                batch_im, batch_lab = self.exp_rpl.replay(batch_size=batch_size)
+                self.main_batches(batch_im, batch_lab)
+
+    def random_batch(self, batch_size, dataset):
+        im_o, label_o = dataset['im'], dataset['label']
+        batch_tmp_im, batch_tmp_lab = [], []
+        for i in range(batch_size):
+            ind_tmp = np.random.randint(len(dataset['im']))
+            batch_tmp_im.append(im_o[ind_tmp])
+            batch_tmp_lab.append(label_o[ind_tmp])
+        batch_im, batch_lab = tf.stack(batch_tmp_im), tf.stack(batch_tmp_lab)
+        return batch_im, batch_lab
+
+    def main(self, best_pix, im, epoch_size=1, batch_size=3, augmentation_factor=4):
+        label = self.compute_labels(1, best_pix, shape=im.shape)
+        plt.subplot(1, 2, 1)
+        plt.imshow(label)
+        plt.subplot(1, 2, 2)
+        plt.imshow(im)
+        plt.show()
+        im = resize(im, (224, 224, 3), anti_aliasing=True)
+        label = resize(label, (224, 224, 3), anti_aliasing=True)
+        dataset = da.OnlineAugmentation().generate_batch(im, label, viz=False, augmentation_factor=augmentation_factor)
+        for epoch in range(epoch_size):
+            for batch in range(len(dataset['im']) // batch_size):
+                print('Epoch {}/{}, Batch {}/{}'.format(epoch + 1, epoch_size, batch + 1,
+                                                        len(dataset['im']) // batch_size))
+                batch_im, batch_lab = self.random_batch(batch_size, dataset)
+                self.main_batches(batch_im, batch_lab)
+        batch_im, batch_lab = self.exp_rpl.replay()
+        self.main_batches(batch_im, batch_lab)
+        print('Finish XP replay')
+
+#### Accessoires #######
     def vizualisation(self, img, idx):
         prediction = cv2.circle(img[0], (int(idx[1]), int(idx[0])), 7, (255, 255, 255), 2)
         plt.imshow(prediction)
@@ -184,7 +252,7 @@ class Trainer(object):
         img = img / np.max(img)
         return img
 
-#### For Tensorboard
+#### For Tensorboard #####
     def create_log(self):
         self.logger = tf.contrib.summary.create_file_writer(logdir='logs')
 
@@ -248,50 +316,25 @@ class Trainer(object):
                 pass
 
 
-    def main(self, best_pix, im):
-        label = self.compute_labels(1, best_pix, shape=im.shape)
-        print(label.shape)
-        plt.subplot(1, 2, 1)
-        plt.imshow(label)
-        plt.subplot(1, 2, 2)
-        plt.imshow(im)
-        plt.show()
-
-        im = resize(im, (224, 224, 3), anti_aliasing=True)
-        label = resize(label, (224, 224, 3), anti_aliasing=True)
-        dataset = da.OnlineAugmentation().generate_batch(im, label, viz=False, augmentation_factor=4)
-        im_o, label_o = dataset['im'], dataset['label']
-        epoch_size = 1
-        batch_size =1  
-        print('ici')
-        for epoch in range(epoch_size):
-            print('la')
-            for batch in range(len(dataset['im']) // batch_size):
-                print('Epoch {}/{}, Batch {}/{}'.format(epoch + 1, epoch_size, batch + 1,
-                                                        len(dataset['im']) // batch_size))
-                batch_tmp_im, batch_tmp_lab = [], []
-                for i in range(batch_size):
-                    ind_tmp = np.random.randint(len(dataset['im']))
-                    batch_tmp_im.append(im_o[ind_tmp])
-                    batch_tmp_lab.append(label_o[ind_tmp])
-                batch_im, batch_lab,  = tf.stack(batch_tmp_im), tf.stack(batch_tmp_lab),
-                self.main_batches(batch_im, batch_lab)
-
-        self.exp_rpl.replay() 
 if __name__=='__main__':
-    Network = Trainer(savetosnapshot=False, snapshot_file='reference')
-    im = np.zeros((224, 224, 3), np.float32)
-    im[70:190, 100:105, :] = 1
-    im[70:80, 80:125, :] = 1
+    Network = Trainer(savetosnapshot=False, load=True, snapshot_file='reference')
+    im = np.zeros((1, 224, 224, 3), np.float32)
+    im[:, 70:190, 100:105, :] = 1
+    im[:, 70:80, 80:125, :] = 1
 
     best_pix = [103, 125, 0, 40, 10]
     best_pix = [83, 76, 0, 20, 10]         # x, y, angle, e, lp
 
-
+    out = Network.forward(im)
+    viz = Network.prediction_viz(out, im)
+    np.save('outputforFrancois.npy', viz)
+    plt.imshow(viz)
+    plt.show()
 
     ### Viz Demonstration ###
     viz_demo = True
     if viz_demo:
+        print('demo')
         x, y, angle, e, lp = best_pix[0], best_pix[1], best_pix[2], best_pix[3], best_pix[4]
         rect = div.draw_rectangle(e, angle, x, y, lp)
         im_test = np.zeros((224, 224, 3))
@@ -299,5 +342,15 @@ if __name__=='__main__':
         demo = cv2.fillConvexPoly(im_test, rect, color=3)
         plt.imshow(demo)
         plt.show()
-    # Test de Tensorboard
+
     Network.main(best_pix, im)
+
+    #
+    im = np.zeros((1, 224, 224, 3), np.float32)
+    im[:, 70:190, 100:105, :] = 1
+    im[:, 70:80, 80:125, :] = 1
+    out = Network.forward(im)
+    viz = Network.prediction_viz(out, im)
+
+    plt.imshow(viz)
+    plt.show()

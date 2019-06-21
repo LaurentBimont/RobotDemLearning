@@ -24,7 +24,6 @@ class DensenetFeatModel(tf.keras.Model):
 
     def call(self, inputs):
         # inputs = tf.transpose(inputs,(0,3,2,1))
-        print(inputs.shape)
         output = self.model(inputs)
         return output
 
@@ -60,13 +59,14 @@ class GraspNet(BaseDeepModel):
         # https://arxiv.org/abs/1502.03167
         self.bn0 = tf.keras.layers.BatchNormalization(name="grasp-b0")
         self.conv0 = tf.keras.layers.Convolution2D(128, kernel_size=1, strides=1, activation=tf.nn.relu,
-                                            use_bias=True, padding='same', name="grasp-conv0", trainable=True)
+                                                    use_bias=True, padding='same', name="grasp-conv0", trainable=True)
 
         self.bn1 = tf.keras.layers.BatchNormalization(name="grasp-b1")
         self.conv2 = tf.keras.layers.Convolution2D(3, kernel_size=1, strides=1, activation=tf.nn.relu,
-                                            use_bias=False, padding='same', name="grasp-conv1", trainable=True)
+                                                    use_bias=False, padding='same', name="grasp-conv1", trainable=True)
         self.bn2 = tf.keras.layers.BatchNormalization(name="grasp-b2")
-
+        self.conv3 = tf.keras.layers.Convolution2D(1, kernel_size=1, strides=1, activation=tf.nn.sigmoid,
+                                                   use_bias=False, padding='same', name='grasp-conv2', trainable=True)
 
     def call(self, inputs, bufferize=False, step_id=-1):
         # print('Entrée du réseau seondaire', inputs.shape)
@@ -80,6 +80,7 @@ class GraspNet(BaseDeepModel):
         # Rescaling between 0 and 1
         # x = tf.div(tf.subtract(x, tf.reduce_min(x)), tf.subtract(tf.reduce_max(x), tf.reduce_min(x)))
         # x = tf.sigmoid(self.bn2(x))
+        # x = self.conv3(x)
         x = (x[:, :, :, 0] + x[:, :, :, 1] + x[:, :, :, 2]) #/ 3.
         x = tf.reshape(x, (*x.shape, 1))
         # for i in range(x.shape[0]):
@@ -109,7 +110,6 @@ class Reinforcement(tf.keras.Model):
         # x = self.QGrasp(input)
         x = self.QGrasp(self.Dense(input))
         return x
-
 
 if __name__ == "__main__":
     

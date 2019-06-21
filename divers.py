@@ -19,6 +19,9 @@ def draw_rectangle(e, theta, x0, y0, lp):
 
 def heatmap2pointcloud(img):
     # Rescale between 0 and 1
+    plt.imshow(img)
+    print(img)
+    plt.show()
     img = (img - np.min(img))/(np.max(img)-np.min(img))
     PointCloudList = []
     img = img - 0.6
@@ -55,6 +58,8 @@ def angle2robotangle(angle):
 
 def preprocess_depth_img(depth_image):
     depth_image[depth_image > 0.6] = 0
+    depth_image[depth_image == 0] = np.mean(depth_image[depth_image != 0])
+    print('C est par la', np.max(depth_image), np.min(depth_image), np.mean(depth_image))
     min = second_min(depth_image.flatten())
     print('Le deuxième minimum est ', min)
     plt.subplot(1, 3, 1)
@@ -62,7 +67,7 @@ def preprocess_depth_img(depth_image):
     depth_image = np.ones(depth_image.shape) - (depth_image - min) / (depth_image.max() - min)
     plt.subplot(1, 3, 2)
     plt.imshow(depth_image)
-    depth_image[depth_image > 1] = 0
+    # depth_image[depth_image > 1] = 0
     plt.subplot(1, 3, 3)
     plt.imshow(depth_image)
     plt.show()
@@ -117,3 +122,14 @@ def postprocess_pred(out):
     e = 30
     theta = py_ang([1, 0], vectors[0])*180/np.pi
     return x_max, y_max, theta, e
+
+def get_angle(fingers):
+    u1, v1, u2, v2 = fingers[0], fingers[1], fingers[2], fingers[3]
+    angle = 180/np.pi * py_ang(np.array([u1-u2, v1-v2]), np.array([1, 0]))
+    return(angle - 90)
+
+def get_ecartement(fingers):
+    # return np.linalg.norm(self.cam.transform_3D(u1, v1)-self.cam.transform_3D(u2, v2))
+    u1, v1, u2, v2 = fingers[0], fingers[1], fingers[2], fingers[3]
+    ##### Temporaire : renvoie juste la difference en pixel #######"
+    return np.linalg.norm(np.array([[u1-u2], [v1-v2]]))
