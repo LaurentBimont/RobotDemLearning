@@ -2,20 +2,9 @@ import tensorflow as tf
 import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.decomposition import PCA
+from skimage.transform import resize
+import cv2
 
-def draw_rectangle(e, theta, x0, y0, lp):
-    #x1, y1, lx, ly, theta = params[0], params[1], params[2], params[3], params[4]
-    theta_rad = theta * np.pi/180
-    x1 = int(x0 - lp/2*np.cos(theta_rad) - e/2*np.sin(theta_rad))
-    y1 = int(y0 + lp/2*np.sin(theta_rad) - e/2*np.cos(theta_rad))
-    x2 = int(x0 + lp/2*np.cos(theta_rad) - e/2*np.sin(theta_rad))
-    y2 = int(y0 - lp/2*np.sin(theta_rad) - e/2*np.cos(theta_rad))
-    x3 = int(x0 - lp/2*np.cos(theta_rad) + e/2*np.sin(theta_rad))
-    y3 = int(y0 + lp/2*np.sin(theta_rad) + e/2*np.cos(theta_rad))
-    x4 = int(x0 + lp/2*np.cos(theta_rad) + e/2*np.sin(theta_rad))
-    y4 = int(y0 - lp/2*np.sin(theta_rad) + e/2*np.cos(theta_rad))
-
-    return np.array([[x1, y1], [x2, y2], [x4, y4], [x3, y3]], dtype=np.int)
 
 def heatmap2pointcloud(img):
     # Rescale between 0 and 1
@@ -57,7 +46,8 @@ def angle2robotangle(angle):
     return angle
 
 def preprocess_depth_img(depth_image):
-    depth_image[depth_image > 0.6] = 0
+    depth_image[depth_image > 0.55] = 0
+    depth_image[depth_image < 0.35] = 0
     depth_image[depth_image == 0] = np.mean(depth_image[depth_image != 0])
     print('C est par la', np.max(depth_image), np.min(depth_image), np.mean(depth_image))
     min = second_min(depth_image.flatten())
@@ -133,3 +123,41 @@ def get_ecartement(fingers):
     u1, v1, u2, v2 = fingers[0], fingers[1], fingers[2], fingers[3]
     ##### Temporaire : renvoie juste la difference en pixel #######"
     return np.linalg.norm(np.array([[u1-u2], [v1-v2]]))
+
+def draw_rectangle(e, theta, x0, y0, lp):
+    #x1, y1, lx, ly, theta = params[0], params[1], params[2], params[3], params[4]
+    theta_rad = theta * np.pi/180
+    x1 = int(x0 - lp/2*np.cos(theta_rad) - e/2*np.sin(theta_rad))
+    y1 = int(y0 + lp/2*np.sin(theta_rad) - e/2*np.cos(theta_rad))
+    x2 = int(x0 + lp/2*np.cos(theta_rad) - e/2*np.sin(theta_rad))
+    y2 = int(y0 - lp/2*np.sin(theta_rad) - e/2*np.cos(theta_rad))
+    x3 = int(x0 - lp/2*np.cos(theta_rad) + e/2*np.sin(theta_rad))
+    y3 = int(y0 + lp/2*np.sin(theta_rad) + e/2*np.cos(theta_rad))
+    x4 = int(x0 + lp/2*np.cos(theta_rad) + e/2*np.sin(theta_rad))
+    y4 = int(y0 - lp/2*np.sin(theta_rad) + e/2*np.cos(theta_rad))
+
+    return np.array([[x1, y1], [x2, y2], [x4, y4], [x3, y3]], dtype=np.int)
+
+
+def compute_labels(best_pix_ind, shape=(224,224,3), viz=False):
+    '''Create the targeted Q-map
+    :param label_value: Reward of the action
+    :param best_pix_ind: (Rectangle Parameters : x(colonne), y(ligne), angle(en degré), ecartement(en pixel)) Pixel where to perform the action
+    :return: label : an 224x224 array where best pix is at future reward value
+             label_weights : a 224x224 where best pix is at one
+    '''
+    label = np.zeros(shape, dtype=np.float32)
+    for i in range(len(best_pix_ind)):
+    # Compute labels
+        label_temp = np.zeros(shape, dtype=np.float32)
+        x, y, angle, e, lp, label_val = best_pix_ind[i]
+        rect = draw_rectangle(e, angle, x, y, lp)
+        cv2.fillConvexPoly(label_temp, rect, color=1)
+        label[np.where(label_temp == 1)] = label_val
+
+    label = resize(label, (224, 224, 3))
+    # label_test = (label - np.min(label))/(np.max(label)-np.min(label))
+    # label_test = resize(label_test, (224, 224, 3))
+    # plt.imshow(label_test)
+    # plt.show()
+    return label

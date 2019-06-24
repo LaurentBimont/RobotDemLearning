@@ -11,7 +11,6 @@ if __name__=="__main__":
 #Test
 #from trainer import Trainer
 
-
 class OnlineAugmentation(object):
     def __init__(self):
         self.batch = None
@@ -20,17 +19,21 @@ class OnlineAugmentation(object):
         self.seed = np.random.randint(1234)
         self.original_size = (224, 224)
 
+    def replace_0(self, batch, second_min):
+        condition = tf.equal(batch[0], 0)
+        case_true = tf.ones(batch[0].shape)*float(second_min)
+        case_false = batch[0]
+        return tf.stack([tf.where(condition, case_true, case_false), batch[1]])
+
     def create_batch(self, im, label):
         '''Create a tensorflow batch of image, label and label weights
         :param im: input image (numpy (224x224x3))
         :param label: label (numpy (224x224x3))
-        :param label_weights: label weights (numpy (224x224x3))
         :return: Return a batch of those 3 inputs
         '''
         if type(im).__module__ == np.__name__:
             # If it is a numpy array
             im = np.reshape(im, (224, 224, 3))
-
         my_batch = [im, label]
         self.batch = tf.stack(my_batch)
 
@@ -47,7 +50,6 @@ class OnlineAugmentation(object):
         '''Flip images
         :param im: input image (numpy (224x224x3))
         :param label: label (numpy (224x224x3))
-        :param label_weights: label weights (numpy (224x224x3))
         :return: Flipping inputs in Tensor Format (rq : flip[1] and flip[2] have to be resized to the output format
                  of the Network
         '''
@@ -62,17 +64,19 @@ class OnlineAugmentation(object):
         # To be deleted
         return flip[0], flip[1]
 
-    def rotate(self, im, label, angle=0):
+    def rotate(self, im, label, mini, angle=0):
         '''Rotate image
         :param im: input image (numpy (224x224x3))
         :param label: label (numpy (224x224x3))
-        :param label_weights: label weights (numpy (224x224x3))
         :param angle: angle of rotation
         :return: Flipping inputs in Tensor Format (rq : rotation[1] and rotation[2] have to be resized to the output format
                  of the Network
         '''
         self.create_batch(im, label)
         rotation = tf.contrib.image.rotate(self.batch, angles=angle)
+        # rotation_filled = self.replace_0(rotation[0], mini)
+        # rotation = tf.stack([rotation_filled, rotation[1]])
+        rotation = self.replace_0(rotation, mini)
         if self.assert_label(rotation[1]):
             self.add_im(rotation)
 
@@ -83,8 +87,6 @@ class OnlineAugmentation(object):
         '''Crop image
         :param im: input image (numpy (224x224x3))
         :param label: label (numpy (224x224x3))
-        :param label_weights: label weights (numpy (224x224x3))
-
         :return: Cropping inputs in Tensor Format (rq : crop[1] and crop[2] have to be resized to the output format
                  of the Network
         '''
@@ -97,15 +99,13 @@ class OnlineAugmentation(object):
         # To be deleted
         return crop[0], crop[1]
 
-    def translate(self, im, label, pad_top=0, pad_left=0, pad_bottom=0, pad_right=0):
+    def translate(self, im, label, mini, pad_top=0, pad_left=0, pad_bottom=0, pad_right=0):
         '''Crop image
         :param im: input image (numpy (224x224x3))
         :param label: label (numpy (224x224x3))
-        :param label_weights: label weights (numpy (224x224x3))
         :param pad_top: translation to the bottom (pixels)
         :param pad_left: translation to the right (pixels)
         :param pad_bottom: translation to the bottom (pixels)
-        :param
 
         :return: Translated inputs in Tensor Format (rq : translate[1] and translate[2] have to be resized to the output format
                  of the Network
@@ -116,6 +116,7 @@ class OnlineAugmentation(object):
                                          width + pad_right + pad_left)
         # pad_to_bounding_box(image, offset_height, offset_width, target_height, target_width
         translate = tf.image.crop_to_bounding_box(x, pad_bottom, pad_right, height, width)
+        translate = self.replace_0(translate, mini)
         if self.assert_label(translate[1]):
             self.add_im(translate)
         return translate[0], translate[1]
@@ -127,15 +128,17 @@ class OnlineAugmentation(object):
         :return: True if a valid grasping point is still in the image
                  False otherwise
         '''
-        if np.sum(label.numpy()) > 5:
+        print('la somme du truc', np.sum(label.numpy()))
+        label_temp = label.numpy()
+        label_temp[label_temp != 0] = 1
+        if np.sum(label_temp) > 20:
             return True
         return False
 
-    def generate_batch(self, im, label, augmentation_factor=2, viz=False):
+    def generate_batch(self, im, label, mini, augmentation_factor=2, viz=False):
         '''Generate new images and label from one image/demonstration
         :param im: input image (numpy (224x224x3))
         :param label: label (numpy (224x224x3))
-        :param label_weights: label weights (numpy (224x224x3))
         :param augmentation_factor: number of data at the end of augmentation (3xaugmentation_factor³)
         :return: Batch of the augmented DataSet
         '''
@@ -151,14 +154,14 @@ class OnlineAugmentation(object):
             if self.assert_label(lab):
                 print(2)
                 for j in range(augmentation_factor):
-                    ima, lab = self.translate(ima, lab,
+                    ima, lab = self.translate(ima, lab, mini,
                                                      pad_top=np.random.randint(0, 50),
                                                      pad_left=np.random.randint(0, 50),
                                                      pad_bottom=np.random.randint(0, 50),
                                                      pad_right=np.random.randint(0, 50))
                     if self.assert_label(lab):
                         for k in range(augmentation_factor):
-                            ima, lab = self.rotate(ima, lab, angle=np.random.rand()*0.785)
+                            ima, lab = self.rotate(ima, lab, mini, angle=np.random.rand()*0.785)
                             if viz:
                                 if self.assert_label(lab):
 

@@ -33,10 +33,10 @@ class Trainer(object):
         self.loss_value = 0
         self.iteration = 0
         self.num = 0
-        self.classifier_boolean = True
+        self.classifier_boolean = False
         self.savetosnapshot = savetosnapshot
         # self.create_log()
-        self.exp_rpl = ExperienceReplay(self,["depth_heightmap","label","loss"]) 
+        self.exp_rpl = ExperienceReplay(["depth_heightmap", "label", "loss"])
         # Frequency
         self.viz_frequency = 20
         self.saving_frequency = 50
@@ -81,12 +81,21 @@ class Trainer(object):
 
     def compute_loss_dem(self, label, noBackprop=False):
         # expected_reward, action_reward = self.action.compute_reward(self.action.grasp, self.future_reward)
+        # plt.subplot(1, 4, 4)
+        # plt.imshow(label.numpy()[0, :, :, 0])
         label = self.reduced_label(label)
 
         new_lab, label_numpy = self.output_prob.numpy(), label.numpy()
+        # plt.subplot(1, 4, 1)
+        # plt.imshow(label_numpy[0, :, :, 0])
+        # plt.subplot(1, 4, 2)
+        # plt.imshow(new_lab[0, :, :, 0])
         new_lab[label_numpy == 1] = 1
         new_lab[label_numpy == -1] = 0
         new_lab[label_numpy != 1] /= 2
+        # plt.subplot(1, 4, 3)
+        # plt.imshow(new_lab[0, :, :, 0])
+        # plt.show()
         label = tf.convert_to_tensor(new_lab)
         # print(new_lab[0,:,:,:].shape, self.output_prob[0,:,:,:].shape)
 
@@ -100,7 +109,9 @@ class Trainer(object):
         # print('La valeur de perte est {}'.format(self.loss_value.numpy()))
         # Tensorboard ouputs
 
-        if (tf.train.get_global_step() is not None) and (tf.train.get_global_step().numpy()%self.viz_frequency == 0):
+        if (tf.train.get_global_step() is not None) \
+                and (tf.train.get_global_step().numpy() % self.viz_frequency == 0) \
+                and (not noBackprop):
             print('Printing to Tensorboard')
             img_tensorboard = self.prediction_viz(3*self.output_prob, self.image)
             img_tensorboard_target = self.prediction_viz(label.numpy(), self.image)
@@ -110,10 +121,10 @@ class Trainer(object):
             self.log_scalar('loss value_dem', self.loss_value)
             output_prob_plt = self.draw_scatter(self.output_prob[0])
         # Saving a snapshot file
-        if (self.savetosnapshot) and\
-                (tf.train.get_global_step() is not None) and \
-                (tf.train.get_global_step().numpy()%self.saving_frequency == 0) and\
-                (not noBackprop):
+        if (self.savetosnapshot)\
+                and (tf.train.get_global_step() is not None)\
+                and (tf.train.get_global_step().numpy()%self.saving_frequency == 0)\
+                and (not noBackprop):
             self.save_model()
         return self.loss_value
 
@@ -125,7 +136,7 @@ class Trainer(object):
                  label_weights : a 224x224 where best pix is at one
         '''
         # Compute labels
-        x, y, angle, e, lp = best_pix_ind[0], best_pix_ind[1], best_pix_ind[2], best_pix_ind[3], best_pix_ind[4]
+        x, y, angle, e, lp = best_pix_ind
         rect = div.draw_rectangle(e, angle, x, y, lp)
         label = np.zeros(shape, dtype=np.float32)
         cv2.fillConvexPoly(label, rect, color=1)
@@ -148,7 +159,6 @@ class Trainer(object):
         '''
 
         label = tf.convert_to_tensor(label, np.float32)
-
         label = tf.image.resize_images(label, (self.width, self.height))
         label = tf.reshape(label[:, :, :, 0], (self.batch, self.width, self.height, 1))
         if self.classifier_boolean:
@@ -172,16 +182,17 @@ class Trainer(object):
         self.exp_rpl.store([im, label, self.loss_value])
 
     def main_without_backprop(self, im, best_pix, batch_size=1, augmentation_factor=4):
-        label = self.compute_labels(1, best_pix, shape=im.shape)
+        # label = self.compute_labels(1, best_pix, shape=im.shape)
+        label = best_pix
         im = resize(im, (224, 224, 3), anti_aliasing=True)
         label = resize(label, (224, 224, 3), anti_aliasing=True)
-        print(type(im), type(label), im.shape, label.shape)
-        plt.subplot(1, 2, 1)
-        plt.imshow(im[:, :, 0])
-        plt.subplot(1, 2, 2)
-        plt.imshow(label[:, :, 0])
-        plt.show()
-        dataset = da.OnlineAugmentation().generate_batch(im, label, viz=False, augmentation_factor=augmentation_factor)
+        # plt.subplot(1, 2, 1)
+        # plt.imshow(im[:, :, 0])
+        # plt.subplot(1, 2, 2)
+        # plt.imshow(label[:, :, 0])
+        # plt.show()
+        print('Data Augmentation')
+        dataset = da.OnlineAugmentation().generate_batch(im, label, np.mean(im), viz=False, augmentation_factor=augmentation_factor)
 
         for batch in range(len(dataset['im'])//batch_size):
             batch_im, batch_label = self.random_batch(batch_size, dataset)
@@ -192,9 +203,11 @@ class Trainer(object):
                 print('{}/{}'.format(batch, len(dataset['im'])//batch_size))
 
     def main_xpreplay(self, nb_epoch=2, batch_size=3):
+        self.exp_rpl.generate_ranking()
         for epoch in range(nb_epoch):
             for batch in range(100):
-                print('Epoch {}/{}, Batch {}/{}'.format(epoch + 1, nb_epoch, batch + 1, 100))
+                if batch % 20 == 0:
+                    print('Epoch {}/{}, Batch {}/{}'.format(epoch + 1, nb_epoch, batch + 1, 100))
                 batch_im, batch_lab = self.exp_rpl.replay(batch_size=batch_size)
                 self.main_batches(batch_im, batch_lab)
 
@@ -208,8 +221,9 @@ class Trainer(object):
         batch_im, batch_lab = tf.stack(batch_tmp_im), tf.stack(batch_tmp_lab)
         return batch_im, batch_lab
 
-    def main(self, best_pix, im, epoch_size=1, batch_size=3, augmentation_factor=4):
-        label = self.compute_labels(1, best_pix, shape=im.shape)
+    def main(self, best_pix, im, epoch_size=1, batch_size=1, augmentation_factor=4):
+        # label = self.compute_labels(1, best_pix, shape=im.shape)
+        label = best_pix
         plt.subplot(1, 2, 1)
         plt.imshow(label)
         plt.subplot(1, 2, 2)
@@ -217,15 +231,22 @@ class Trainer(object):
         plt.show()
         im = resize(im, (224, 224, 3), anti_aliasing=True)
         label = resize(label, (224, 224, 3), anti_aliasing=True)
-        dataset = da.OnlineAugmentation().generate_batch(im, label, viz=False, augmentation_factor=augmentation_factor)
+        dataset = da.OnlineAugmentation().generate_batch(im, label, np.mean(im), viz=False, augmentation_factor=augmentation_factor)
         for epoch in range(epoch_size):
             for batch in range(len(dataset['im']) // batch_size):
                 print('Epoch {}/{}, Batch {}/{}'.format(epoch + 1, epoch_size, batch + 1,
                                                         len(dataset['im']) // batch_size))
                 batch_im, batch_lab = self.random_batch(batch_size, dataset)
+                print('LAAAA')
+                # plt.subplot(1,2,1)
+                # plt.imshow(batch_lab.numpy()[0,:,:,0])
+                # plt.subplot(1, 2, 2)
+                # plt.imshow(batch_im.numpy()[0, :, :, 0])
+                # plt.show()
                 self.main_batches(batch_im, batch_lab)
-        batch_im, batch_lab = self.exp_rpl.replay()
-        self.main_batches(batch_im, batch_lab)
+
+        # batch_im, batch_lab = self.exp_rpl.replay()
+        # self.main_batches(batch_im, batch_lab)
         print('Finish XP replay')
 
 #### Accessoires #######
