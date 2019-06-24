@@ -122,8 +122,8 @@ def get_ecartement_pince(vp, theta, center, image, camera):
 
     P0 = camera.transform_3D(u0, v0, image)
 
-    u1 = int(u0 + sigma * np.cos(theta))
-    v1 = int(v0 + sigma * np.sint(theta))
+    u1 = int(u0 - sigma * np.cos(theta))
+    v1 = int(v0 + sigma * np.sin(theta))
     P1 = camera.transform_3D(u1,v1, image)
 
     e = np.sqrt((P0-P1).dot(P0-P1))
