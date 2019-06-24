@@ -2,7 +2,7 @@ import tensorflow as tf
 import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.decomposition import PCA
-
+import cv2
 def draw_rectangle(e, theta, x0, y0, lp):
     #x1, y1, lx, ly, theta = params[0], params[1], params[2], params[3], params[4]
     theta_rad = theta * np.pi/180
@@ -119,9 +119,40 @@ def postprocess_pred(out):
     vectors[1] *= sing_val[1]
     np.linalg.norm(pca.singular_values_)
     origin = [zoom_pixel], [zoom_pixel]
-    e = 30
+    
     theta = py_ang([1, 0], vectors[0])*180/np.pi
+    # e = 30
+    e = get_ecartement_pince()
+    
     return x_max, y_max, theta, e
+
+
+def get_ecartement_pince(im):
+    heightmap = im.copy() 
+    im2 = heightmap[:,:,1]
+    im2 = (im2-np.min(im2))/(np.max(im2)-np.min(im2))
+    im2 = im2*255
+    im2 = im2.astype(np.uint8)
+
+    ret,thresh = cv2.threshold(im2,60,255,0)
+    contours,hierarchy = cv2.findContours(thresh, 1, 2)
+    cnt = contours[0]
+    rect = cv2.minAreaRect(cnt)
+    box = cv2.boxPoints(rect)
+    box = np.int0(box)
+    cv2.drawContours(im,[box],0,(0,0,255),2)
+    ellipse = cv2.fitEllipse(cnt)
+
+    cv2.ellipse(heightmap,ellipse,(0,255,0),2)
+    cv2.drawContours(heightmap,[box],0,(0,0,255),2)
+
+    plt.imshow(heightmap)
+    plt.show()
+    a = (ellipse[0][0]-ellipse[1][0])/2
+    b = (ellipse[0][1]-ellipse[1][1])/2
+    a = min(a,b)
+
+
 
 def get_angle(fingers):
     u1, v1, u2, v2 = fingers[0], fingers[1], fingers[2], fingers[3]
