@@ -666,3 +666,4 @@ dmypy.json
 # glossaries
 
 # End of https://www.gitignore.io/api/c,git,tex,c++,cuda,cmake,emacs,latex,python
+iiwaPy/__pycache__/
