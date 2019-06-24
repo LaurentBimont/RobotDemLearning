@@ -92,7 +92,7 @@ def postprocess_img( imgs, list_angles):
     resized_imgs = tf.image.resize_images(rimgs, (320, 320))
     return resized_imgs
 
-def postprocess_pred(out):
+def postprocess_pred(out, depthimage, camera):
     out[out < 0] = 0
     zoom_pixel = 60
     plt.imshow(out)
@@ -111,7 +111,7 @@ def postprocess_pred(out):
     
     theta = py_ang([1, 0], vectors[0])*180/np.pi
     # e = 30
-    e = get_ecartement_pince()
+    e = get_ecartement_pince(sing_val[1], theta, (y_max, x_max), image, camera)
     
     return x_max, y_max, theta, e
 
