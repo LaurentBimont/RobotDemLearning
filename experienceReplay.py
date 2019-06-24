@@ -18,18 +18,15 @@ class ExperienceReplay:
         self.replay_buffer.append(data)
 
     def generate_ranking(self):
-        print(len(self.replay_buffer))
         if len(self.replay_buffer) > 2:
             print("experience replay {} experience are stored in buffer ".format(len(self.replay_buffer)))
             self.data = pd.DataFrame(self.replay_buffer, columns=self.header)
-            print(len(self.data))
             if len(self.data) == 0:
                 return
             # We sort the buffer by increasing loss
             self.data = self.data.sort_values("loss")
             if len(self.data) > 1000:
                 self.data = self.data.iloc[-1000:]
-            print(self.data.shape)
 
     def replay(self, batch_size=3):
         if self.data is not None:
