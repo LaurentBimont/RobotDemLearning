@@ -31,7 +31,7 @@ def get_pred(camera, trainer):
     plt.imshow(out)
     plt.show()
     np.save('outfrofrancois.npy', out)
-    x_pred, y_pred, angle_pred, e_pred = div.postprocess_pred(out)
+    x_pred, y_pred, angle_pred, e_pred = div.postprocess_pred(out, depth_image, camera)
     viz = True
     if viz:
         rect = div.draw_rectangle(e_pred, angle_pred, x_pred, y_pred, 20)
