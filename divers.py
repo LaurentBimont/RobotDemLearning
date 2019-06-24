@@ -140,7 +140,7 @@ def get_ecartement_pince(im):
     rect = cv2.minAreaRect(cnt)
     box = cv2.boxPoints(rect)
     box = np.int0(box)
-    cv2.drawContours(im,[box],0,(0,0,255),2)
+    cv2.drawContours(heightmap,[box],0,(0,0,255),2)
     ellipse = cv2.fitEllipse(cnt)
 
     cv2.ellipse(heightmap,ellipse,(0,255,0),2)
