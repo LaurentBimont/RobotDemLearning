@@ -156,7 +156,9 @@ class FingerTracker(object):
         # x, y, angle, e = 327, 252, -90, 40
         print(x, y, angle, e, 2*e)
         # self.cam.stop_pipe()
-        return x, y, angle, 0.8*e, 1.2*e, depth_without_hand, frame_without_hand
+        e = 0.5*e
+        lp = 1.3*e
+        return x, y, angle, e, lp, depth_without_hand, frame_without_hand
 
 if __name__=="__main__":
     FT = FingerTracker()

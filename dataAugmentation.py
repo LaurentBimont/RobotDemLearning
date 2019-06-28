@@ -128,7 +128,6 @@ class OnlineAugmentation(object):
         :return: True if a valid grasping point is still in the image
                  False otherwise
         '''
-        print('la somme du truc', np.sum(label.numpy()))
         label_temp = label.numpy()
         label_temp[label_temp != 0] = 1
         if np.sum(label_temp) > 20:

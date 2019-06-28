@@ -6,6 +6,9 @@ from skimage.transform import resize
 import time as time
 import sys, os
 import traceback
+from os import listdir
+from os.path import isfile, join
+
 
 ## Import des différentes classes
 import divers as div
@@ -25,12 +28,10 @@ def get_pred(camera, trainer):
     depth_image = depth_image.reshape((1, 224, 224, 3))
     output_prob = trainer.forward(depth_image)
     out = trainer.prediction_viz(output_prob, depth_image)
-    print('Taille de sortie : ', out.shape)
     out = out.reshape((224, 224, 3))
     out = resize(out, init_shape)
-    plt.imshow(out)
-    plt.show()
-    np.save('outfrofrancois.npy', out)
+    print(out)
+    print(np.max(out))
     x_pred, y_pred, angle_pred, e_pred = div.postprocess_pred(out)
     viz = True
     if viz:
@@ -51,112 +52,132 @@ def get_pred(camera, trainer):
     return x_pred, y_pred, angle_pred, e_pred, depth
 
 ######### Initialisation des différents outils #########
-# iiwa = Robot()
+iiwa = Robot()
 camera = RealCamera()  # Vraiment utile ?
 FT = FingerTracker()
 time.sleep(1)
 ######### Mise en Position #########
-# iiwa.home()
+iiwa.home()
 
-trainer = Trainer(load=False, snapshot_file='reference_good')
+trainer = Trainer(load=False, snapshot_file='28juin')
 
 ####### Clean Zone #######
 camera.start_pipe()
 time.sleep(1)
 camera_param = [camera.intr.fx, camera.intr.fy, camera.intr.ppx, camera.intr.ppy, camera.depth_scale]
 
+### Paramètre à toucher ###
 demo, trial = 0, 0
-# try:
-while True:
-    DO = input('What do you want to do ? (Demo : 1), (Retrained : 2), (grasp : 3), (stop : 4)')
+load = True
 
-    if DO == '1':
-        continue_demo = '0'
+###########################
+demo_depth, demo_label = [], []
+explo_depth, explo_label = [], []
+try:
+    if load:
+        demoFileDepth = [join('Experiences/Demonstration/depth/', f) for f in listdir('Experiences/Demonstration/depth/') if
+                         isfile(join('Experiences/Demonstration/depth/', f))]
+        demoFileLabel = [join('Experiences/Demonstration/label/', f) for f in listdir('Experiences/Demonstration/label/') if
+                         isfile(join('Experiences/Demonstration/label/', f))]
+        for f_depth, f_label in zip(demoFileDepth, demoFileLabel):
+            demo_depth.append(np.load(f_depth))
+            demo_label.append(np.load(f_label))
 
-        xp_param = []
-        while continue_demo == '0':
-            redo = '0'
-            while redo == '0':
-                x, y, angle, e, lp, depth_image, _ = FT.main(camera)
-                redo = input('Keep that demo ? (Non : 0), (Oui : 1)')
+        exploFileDepth = [join('Experiences/Exploration/depth/', f) for f in listdir('Experiences/Exploration/depth/') if
+                         isfile(join('Experiences/Exploration/depth/', f))]
+        exploFileLabel = [join('Experiences/Exploration/label/', f) for f in listdir('Experiences/Exploration/label/') if
+                         isfile(join('Experiences/Exploration/label/', f))]
+        for f_depth, f_label in zip(exploFileDepth, exploFileLabel):
+            explo_depth.append(np.load(f_depth))
+            explo_label.append(np.load(f_label))
 
-            label_val_ = input('Quelle type de démo ? (bon:1), (mauvais:2)')
-            if label_val_ == '1':
-                label_val = 1
-            else:
-                label_val = -1
-            xp_param.append([x, y, angle, e, lp, label_val])
-            continue_demo = input('Continue demonstrating ? (oui:0) (non:1)')
-        print(xp_param)
-        label_plt = div.compute_labels(xp_param, shape=depth_image.shape)
-        depth_image = div.preprocess_depth_img(depth_image)
-        np.save('Experiences/depth_demo{}.npy'.format(demo), depth_image)
-        np.save('Experiences/parameters_demo{}.npy'.format(demo), label_plt)
-        demo += 1
 
-    if DO == '2':
-        quefaire = input('Recalculer la DataFrame ? (oui:1), (non : 2)')
-        if quefaire=='1':
-            trainer.exp_rpl.clean()
-            print('Experience Replay reset is finished')
-            depth_demo, param_demo = [], []
-            for i in range(demo+1):
-                i=0
-                depth_demo.append(np.load('Experiences/depth_demo{}.npy'.format(i)))
-                param_demo.append(np.load('Experiences/parameters_demo{}.npy'.format(i)))
+    while True:
+        DO = input('What do you want to do ? (Demo : 1), (Retrained : 2), (grasp : 3), (stop : 4)')
+        if DO == '1':
+            continue_demo = '0'
+            xp_param = []
+            while continue_demo == '0':
+                redo = '0'
+                while redo == '0':
+                    x, y, angle, e, lp, depth_image, _ = FT.main(camera)
+                    redo = input('Keep that demo ? (Non : 0), (Oui : 1)')
+                label_val_ = input('Quelle type de démo ? (bon:1), (mauvais:2)')
+                if label_val_ == '1':
+                    label_val = 1
+                else:
+                    label_val = -1
+                xp_param.append([x, y, angle, e, lp, label_val])
+                continue_demo = input('Continue demonstrating ? (oui:0) (non:1)')
 
-                trainer.main_without_backprop(np.load('Experiences/depth_demo{}.npy'.format(i)),
-                                              np.load('Experiences/parameters_demo{}.npy'.format(i)),
-                                              augmentation_factor=3)
-            depth_trial, param_trial = [], []
-
-            if trial != 0:
-                for i in range(trial+1):
-                    depth_trial.append(np.load('Experiences/depth_trial{}.npy'.format(i)))
-                    param_trial.append(np.load('Experiences/parameters_trial{}.npy'.format(i)))
-                    trainer.main_without_backprop(np.load('Experiences/depth_trial{}.npy'.format(i)),
-                                                  np.load('Experiences/parameters_trial{}.npy'.format(i)),
-                                                  augmentation_factor=3)
-            print('starting main training')
-            ### Create experience replay ranking
-            # Train with experience replay
-            trainer.main_xpreplay(batch_size=1)
-        else:
-            depth_demo, param_demo = [], []
-            for i in range(demo + 1):
-                i = 0
-                depth_demo.append(np.load('Experiences/depth_demo{}.npy'.format(i)))
-                param_demo.append(np.load('Experiences/parameters_demo{}.npy'.format(i)))
-            print('voici les entrées : ##############')
+            print(xp_param)
+            label_plt = div.compute_labels(xp_param, shape=depth_image.shape)
+            depth_image = div.preprocess_depth_img(depth_image)
             plt.subplot(1, 2, 1)
-            plt.imshow(param_demo[0])
+            plt.imshow(label_plt)
             plt.subplot(1, 2, 2)
-            plt.imshow(depth_demo[0])
+            plt.imshow(depth_image)
             plt.show()
-            trainer.main(param_demo[0], depth_demo[0])
+            np.save('Experiences/Demonstration/depth/depth_demo{}.npy'.format(demo), depth_image)
+            np.save('Experiences/Demonstration/label/parameters_demo{}.npy'.format(demo), label_plt)
+            demo += 1
+            demo_depth.append(depth_image)
+            demo_label.append(label_plt)
 
-    if DO == '3':
-        x_pred, y_pred, angle_pred, e_pred, depth = get_pred(camera, trainer)
-        print('Parametre du rectangle : ecartement {}, angle {}, x: {}, y: {}, longueur pince {}'.format(e_pred,
-                                                                                                         angle_pred,
-                                                                                                         x_pred,
-                                                                                                         y_pred,
-                                                                                                         20))
-        target_pos = iiwa.from_camera2robot(depth, int(x_pred), int(y_pred), camera_param=camera_param)
-        print('Deplacement du robot à : {} avec pour angle {}'.format(target_pos, angle_pred))
-        grasp_success = iiwa.grasp(target_pos, angle_pred)
-        print(grasp_success)
-        ####### ADD SAVING ######
-    if DO == '4':
-        break
-#
-# except Exception as e:
-#     exc_info = sys.exc_info()
-#     traceback.print_exception(*exc_info)
-#     del exc_info
-#     pass
+        if DO == '2':
+            quefaire = input('Recalculer la DataFrame ? (oui:1), (non : 2)')
+            if quefaire == '1':
+                trainer.exp_rpl.clean()
+                print('Experience Replay reset is finished')
 
-# iiwa.iiwa.close()
+                ### Create experience replay ranking
+                for depth, label in zip(demo_depth, demo_label):
+                    trainer.main_without_backprop(depth,
+                                                  label,
+                                                  augmentation_factor=3,
+                                                  demo=True)
+                for depth, label in zip(explo_depth, explo_label):
+                    trainer.main_without_backprop(depth,
+                                                  label,
+                                                  augmentation_factor=3,
+                                                  demo=False)
+                print('starting main training')
+            ### Train with experience replay
+            trainer.main_xpreplay(nb_epoch=2, batch_size=1)
+
+        if DO == '3':
+            x_pred, y_pred, angle_pred, e_pred, depth = get_pred(camera, trainer)
+            print('Parametre du rectangle : ecartement {}, angle {}, x: {}, y: {}, longueur pince {}'.format(e_pred,
+                                                                                                             angle_pred,
+                                                                                                             x_pred,
+                                                                                                             y_pred,
+                                                                                                             20))
+            target_pos = iiwa.from_camera2robot(depth, int(x_pred), int(y_pred), camera_param=camera_param)
+            print('Deplacement du robot à : {} avec pour angle {}'.format(target_pos, angle_pred))
+            grasp_success = iiwa.grasp(target_pos, angle_pred)
+            print('Le grasp a été réussi : ', grasp_success)
+            if grasp_success:
+                label_value = 1
+            else:
+                label_value = -1
+            depth_image = div.preprocess_depth_img(depth)
+            depth_image = resize(depth_image, (224, 224, 3), anti_aliasing=True)
+            label_plt = div.compute_labels([[x_pred, y_pred, angle_pred, 0.5*e_pred, 0.5*1.2*e_pred, label_value]])
+            np.save('Experiences/Exploration/depth/depth_exploration{}.npy'.format(trial), depth_image)
+            np.save('Experiences/Exploration/label/parameters_exploration{}.npy'.format(trial), label_plt)
+            explo_depth.append(depth_image)
+            explo_label.append(label_plt)
+            trial += 1
+        if DO == '4':
+            break
+
+except Exception as e:
+    exc_info = sys.exc_info()
+    traceback.print_exception(*exc_info)
+    del exc_info
+    pass
+
+iiwa.iiwa.close()
 camera.stop_pipe()
 
 ########## Execution ##########

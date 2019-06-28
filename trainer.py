@@ -92,7 +92,7 @@ class Trainer(object):
         # plt.imshow(new_lab[0, :, :, 0])
         new_lab[label_numpy == 1] = 1
         new_lab[label_numpy == -1] = 0
-        new_lab[label_numpy != 1] /= 2
+        # new_lab[label_numpy != 1] /= 2
         # plt.subplot(1, 4, 3)
         # plt.imshow(new_lab[0, :, :, 0])
         # plt.show()
@@ -181,7 +181,7 @@ class Trainer(object):
 
         self.exp_rpl.store([im, label, self.loss_value])
 
-    def main_without_backprop(self, im, best_pix, batch_size=1, augmentation_factor=4):
+    def main_without_backprop(self, im, best_pix, batch_size=1, augmentation_factor=4, demo=True):
         # label = self.compute_labels(1, best_pix, shape=im.shape)
         label = best_pix
         im = resize(im, (224, 224, 3), anti_aliasing=True)

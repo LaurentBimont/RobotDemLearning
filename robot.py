@@ -180,11 +180,9 @@ class Robot:
     def grasp(self, pos, ang, speed=50):
         angle = div.angle2robotangle(ang)*np.pi/180
         pos[2] = max(pos[2]-60, self.z_min)
-        print(pos[2], self.z_min)
         pos[0] += 14
         pos[1] -= 31.7
         grasp_above = [pos[0], pos[1], pos[2]+100., angle, 0, np.pi]
-        print('Grasp Above {}'.format(grasp_above))
         self.iiwa.movePTPLineEEF(grasp_above, 4*speed, orientationVel=0.5)
         self.grip.openGripper()
         grasp = [pos[0], pos[1], pos[2], angle, 0, np.pi]

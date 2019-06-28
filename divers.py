@@ -8,18 +8,16 @@ import cv2
 def heatmap2pointcloud(img):
     # Rescale between 0 and 1
     plt.imshow(img)
-    print(img)
+    print('Ce qui rentre ')
     plt.show()
     img = (img - np.min(img))/(np.max(img)-np.min(img))
     PointCloudList = []
-    img = img - 0.6
     img[img<0] = 0.
     plt.imshow(img)
     plt.show()
     for index, x in np.ndenumerate(img):
         for i in range(int(x*10)):
             PointCloudList.append([index[1], 100-index[0]])
-
     return np.asarray(PointCloudList)
 
 def py_ang(v1, v2):
@@ -94,11 +92,16 @@ def postprocess_img( imgs, list_angles):
 
 def postprocess_pred(out):
     out[out < 0] = 0
-    zoom_pixel = 60
+    zoom_pixel = 50
+    plt.subplot(1,2,1)
     plt.imshow(out)
-    plt.show()
+
     (y_max, x_max) = np.unravel_index(out[:, :, 1].argmax(), out[:, :, 1].shape)
+    ####### REMARQUE quand le max pixel est a moins de 50 des bords, ca buggue ######
     test_pca = out[y_max-zoom_pixel:y_max+zoom_pixel, x_max-zoom_pixel:x_max+zoom_pixel, 1]
+    plt.subplot(1,2,2)
+    plt.imshow(test_pca)
+    plt.show()
     PointCloud = heatmap2pointcloud(test_pca)
     pca = PCA()
     pca.fit(PointCloud)
@@ -108,10 +111,12 @@ def postprocess_pred(out):
     vectors[1] *= sing_val[1]
     np.linalg.norm(pca.singular_values_)
     origin = [zoom_pixel], [zoom_pixel]
-    
+    e = 2*np.sqrt(sing_val[1])
     theta = py_ang([1, 0], vectors[0])*180/np.pi
-    # e = 30
-    e = get_ecartement_pince()
+    print(theta, e)
+
+    e = 30
+    # e = get_ecartement_pince(out)
     
     return x_max, y_max, theta, e
 
@@ -123,25 +128,23 @@ def get_ecartement_pince(im):
     im2 = im2*255
     im2 = im2.astype(np.uint8)
 
-    ret,thresh = cv2.threshold(im2,60,255,0)
-    contours,hierarchy = cv2.findContours(thresh, 1, 2)
+    ret, thresh = cv2.threshold(im2, 60, 255, 0)
+    contours, hierarchy = cv2.findContours(thresh, 1, 2)
     cnt = contours[0]
     rect = cv2.minAreaRect(cnt)
     box = cv2.boxPoints(rect)
     box = np.int0(box)
-    cv2.drawContours(heightmap,[box],0,(0,0,255),2)
+    cv2.drawContours(heightmap, [box], 0, (0, 0, 255), 2)
     ellipse = cv2.fitEllipse(cnt)
-
-    cv2.ellipse(heightmap,ellipse,(0,255,0),2)
-    cv2.drawContours(heightmap,[box],0,(0,0,255),2)
+    cv2.ellipse(heightmap, ellipse, (0, 255, 0), 2)
+    cv2.drawContours(heightmap, [box], 0, (0, 0, 255), 2)
 
     plt.imshow(heightmap)
     plt.show()
     a = (ellipse[0][0]-ellipse[1][0])/2
     b = (ellipse[0][1]-ellipse[1][1])/2
-    a = min(a,b)
-
-
+    a = min(a, b)
+    return a
 
 def get_angle(fingers):
     u1, v1, u2, v2 = fingers[0], fingers[1], fingers[2], fingers[3]
@@ -185,7 +188,7 @@ def compute_labels(best_pix_ind, shape=(224,224,3), viz=False):
         cv2.fillConvexPoly(label_temp, rect, color=1)
         label[np.where(label_temp == 1)] = label_val
 
-    label = resize(label, (224, 224, 3))
+    label = resize(label, shape)
     # label_test = (label - np.min(label))/(np.max(label)-np.min(label))
     # label_test = resize(label_test, (224, 224, 3))
     # plt.imshow(label_test)

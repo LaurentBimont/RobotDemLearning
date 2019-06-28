@@ -97,7 +97,6 @@ class RealCamera:
         self.color_image = np.asanyarray(color_frame.get_data())
 
         self.mask_color = np.copy(self.color_image)
-        print(self.mask_color.dtype)
         self.mask_color[:, :, 0] *= self.depth_mask
         self.mask_color[:, :, 1] *= self.depth_mask
         self.mask_color[:, :, 2] *= self.depth_mask
@@ -118,7 +117,6 @@ class RealCamera:
             fx, fy, Cx, Cy = self.intr.fx, self.intr.fy, self.intr.ppx, self.intr.ppy
         else:
             fx, fy, Cx, Cy, depth_scale = param
-        print('Les paramètres intrinsèques :', fx, fy, Cx, Cy)
         z = d / depth_scale
         # print('Cy : {} ; Cx : {} ; image dimension {}'.format(Cy, Cx, self.depth_image.shape))
         y = (u - Cy) * z / fy
@@ -132,7 +130,6 @@ class RealCamera:
         :return:
         '''
         if image is None:
-            print('ici')
             depth_img = self.depth_image
 
         else:
