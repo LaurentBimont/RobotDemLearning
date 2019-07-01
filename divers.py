@@ -90,7 +90,7 @@ def postprocess_img( imgs, list_angles):
     resized_imgs = tf.image.resize_images(rimgs, (320, 320))
     return resized_imgs
 
-def postprocess_pred(out):
+def postprocess_pred(out, depthimage, camera):
     out[out < 0] = 0
     zoom_pixel = 50
     plt.subplot(1,2,1)
@@ -111,40 +111,53 @@ def postprocess_pred(out):
     vectors[1] *= sing_val[1]
     np.linalg.norm(pca.singular_values_)
     origin = [zoom_pixel], [zoom_pixel]
-    e = 2*np.sqrt(sing_val[1])
-    theta = py_ang([1, 0], vectors[0])*180/np.pi
-    print(theta, e)
 
-    e = 30
-    # e = get_ecartement_pince(out)
+    # e = 30
+    e = get_ecartement_pince(sing_val[1], theta, (y_max, x_max), image, camera)
     
     return x_max, y_max, theta, e
 
 
-def get_ecartement_pince(im):
-    heightmap = im.copy() 
-    im2 = heightmap[:,:,1]
-    im2 = (im2-np.min(im2))/(np.max(im2)-np.min(im2))
-    im2 = im2*255
-    im2 = im2.astype(np.uint8)
+def get_ecartement_pince(vp, theta, center, image, camera):
+    sigma = np.sqrt(vp)
+    v0, u0 = center
 
-    ret, thresh = cv2.threshold(im2, 60, 255, 0)
-    contours, hierarchy = cv2.findContours(thresh, 1, 2)
-    cnt = contours[0]
-    rect = cv2.minAreaRect(cnt)
-    box = cv2.boxPoints(rect)
-    box = np.int0(box)
-    cv2.drawContours(heightmap, [box], 0, (0, 0, 255), 2)
-    ellipse = cv2.fitEllipse(cnt)
-    cv2.ellipse(heightmap, ellipse, (0, 255, 0), 2)
-    cv2.drawContours(heightmap, [box], 0, (0, 0, 255), 2)
+    P0 = camera.transform_3D(u0, v0, image)
 
-    plt.imshow(heightmap)
-    plt.show()
-    a = (ellipse[0][0]-ellipse[1][0])/2
-    b = (ellipse[0][1]-ellipse[1][1])/2
-    a = min(a, b)
-    return a
+    u1 = int(u0 - sigma * np.cos(theta))
+    v1 = int(v0 + sigma * np.sin(theta))
+    P1 = camera.transform_3D(u1,v1, image)
+
+    e = np.sqrt((P0-P1).dot(P0-P1))
+
+    alpha = 1  
+
+    return e*alpha
+    #  heightmap = im.copy()
+   #  im2 = heightmap[:,:,1]
+   #  im2 = (im2-np.min(im2))/(np.max(im2)-np.min(im2))
+   #  im2 = im2*255
+   #  im2 = im2.astype(np.uint8)
+
+   #  ret,thresh = cv2.threshold(im2,60,255,0)
+   #  contours,hierarchy = cv2.findContours(thresh, 1, 2)
+   #  cnt = contours[0]
+   #  rect = cv2.minAreaRect(cnt)
+   #  box = cv2.boxPoints(rect)
+   #  box = np.int0(box)
+   #  cv2.drawContours(heightmap,[box],0,(0,0,255),2)
+   #  ellipse = cv2.fitEllipse(cnt)
+
+   #  cv2.ellipse(heightmap,ellipse,(0,255,0),2)
+   #  cv2.drawContours(heightmap,[box],0,(0,0,255),2)
+
+   #  plt.imshow(heightmap)
+   #  plt.show()
+   #  a = (ellipse[0][0]-ellipse[1][0])/2
+   #  b = (ellipse[0][1]-ellipse[1][1])/2
+   #  a = min(a,b)
+
+   # return a 
 
 def get_angle(fingers):
     u1, v1, u2, v2 = fingers[0], fingers[1], fingers[2], fingers[3]

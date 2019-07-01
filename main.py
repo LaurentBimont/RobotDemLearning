@@ -32,7 +32,6 @@ def get_pred(camera, trainer):
     out = resize(out, init_shape)
     print(out)
     print(np.max(out))
-    x_pred, y_pred, angle_pred, e_pred = div.postprocess_pred(out)
     viz = True
     if viz:
         rect = div.draw_rectangle(e_pred, angle_pred, x_pred, y_pred, 20)
