@@ -1,6 +1,11 @@
 # Created by https://www.gitignore.io/api/c,git,tex,c++,cuda,cmake,emacs,latex,python
 # Edit at https://www.gitignore.io/?templates=c,git,tex,c++,cuda,cmake,emacs,latex,python
 
+
+Experiences/
+checkpoint*
+
+
 ### C ###
 # Prerequisites
 *.d

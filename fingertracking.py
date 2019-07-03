@@ -54,7 +54,7 @@ class FingerTracker(object):
             cy = int(moment['m01'] / moment['m00'])
             return cx, cy
         else:
-            return Non, Nonee
+            return None, None
 
     def detect_green(self, camera, hist=None):
         self.x_tcp, self.y_tcp = 50, 50
@@ -149,22 +149,20 @@ class FingerTracker(object):
             plt.subplot(2, 2, 2)
             plt.imshow(hsv)
             # # define range for red color in HSV
-            lower_red= np.array([80,70, 50])
-            upper_red= np.array([100,255 , 255])
+            lower_red= cv2.inRange(hsv, np.array([0,100,100]), np.array([10,255,255]))
+            upper_red= cv2.inRange(hsv, np.array([115,100,100]), np.array([180,255,255]))
 
             # # Threshold the HSV image to get only green colors
             # mask = cv2.inRange(hsv, lower_green, upper_green)
             # Threshold the HSV image to get only skin colors
             if hist is None:
-                mask = cv2.inRange(hsv, lower_red, upper_red)
+                mask = upper_red 
                 plt.subplot(2, 2, 3)
                 plt.imshow(mask)
                 kernel = np.ones((3, 3), np.uint8)
                 # mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel, iterations=3)
                 mask = cv2.erode(mask, kernel, iterations=3)
                 res = cv2.bitwise_and(frame_bgr, frame_bgr, mask=mask)
-                plt.subplot(2, 2, 4)
-                plt.imshow(mask)
 
             else:
                 res = self.histMasking(frame, hist)
@@ -175,16 +173,20 @@ class FingerTracker(object):
 
             first_cont, _ = self.max_contour(cont)
             
+            frame = hsv.copy() 
             if first_cont is not None and (not isinstance(first_cont,tuple)) :
                 cx1, cy1 = self.centroid(first_cont)
+
+                
                 print((cx1,cy1))
-                cv2.circle(frame, (cx1, cy1), 5, [0, 0, 255], -1)
 
-                self.x_ref, self.y_ref= cx1, cy1
+                if cx1!=None:
+                    cv2.circle(frame, (cx1, cy1), 5, [0, 0, 255], -1)
 
-                self.list_ref = [cx1, cy1]
-                frame = hsv 
-                cv2.circle(frame, (self.x_ref, self.y_ref), 5, [0, 0, 255], -1)
+                    self.x_ref, self.y_ref= cx1, cy1
+
+                    self.list_ref = [cx1, cy1]
+                    cv2.circle(frame, (self.x_ref, self.y_ref), 5, [0, 0, 255], -1)
             else:
                 cv2.circle(frame, (self.x_ref, self.y_ref), 5, [0, 0, 255], -1)
 
@@ -195,7 +197,7 @@ class FingerTracker(object):
                 break
         plt.show()
         cv2.destroyAllWindows()
-        return [self.x_ref, self.y_ref], self.list
+        return [self.x_ref, self.y_ref], self.list_ref
 
 
     def get_frame_without_hand(self, camera):
@@ -254,7 +256,7 @@ if __name__=="__main__":
     camera_param = [camera.intr.fx, camera.intr.fy, camera.intr.ppx, camera.intr.ppy, camera.depth_scale]
    
     FT.detect_red(camera) 
-    FT.cam.stop_pipe()
+    camera.stop_pipe()
 
 
 
