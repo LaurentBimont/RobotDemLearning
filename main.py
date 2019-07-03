@@ -32,6 +32,7 @@ def get_pred(camera, trainer):
     out = resize(out, init_shape)
     print(out)
     print(np.max(out))
+    x_pred, y_pred, angle_pred, e_pred = div.postprocess_pred(out, depth_image, camera)
     viz = True
     if viz:
         rect = div.draw_rectangle(e_pred, angle_pred, x_pred, y_pred, 20)
@@ -123,7 +124,7 @@ try:
             demo_depth.append(depth_image)
             demo_label.append(label_plt)
 
-        if DO == '2':
+        elif DO == '2':
             quefaire = input('Recalculer la DataFrame ? (oui:1), (non : 2)')
             if quefaire == '1':
                 trainer.exp_rpl.clean()
@@ -144,7 +145,7 @@ try:
             ### Train with experience replay
             trainer.main_xpreplay(nb_epoch=2, batch_size=1)
 
-        if DO == '3':
+        elif DO == '3':
             x_pred, y_pred, angle_pred, e_pred, depth = get_pred(camera, trainer)
             print('Parametre du rectangle : ecartement {}, angle {}, x: {}, y: {}, longueur pince {}'.format(e_pred,
                                                                                                              angle_pred,
@@ -167,17 +168,18 @@ try:
             explo_depth.append(depth_image)
             explo_label.append(label_plt)
             trial += 1
-        if DO == '4':
+        elif DO == '4':
             break
-
+        else:
+           print("wrong number for DO : {}".format(DO)) 
 except Exception as e:
     exc_info = sys.exc_info()
     traceback.print_exception(*exc_info)
     del exc_info
     pass
-
-iiwa.iiwa.close()
-camera.stop_pipe()
+finally:
+    iiwa.iiwa.close()
+    camera.stop_pipe()
 
 ########## Execution ##########
 
