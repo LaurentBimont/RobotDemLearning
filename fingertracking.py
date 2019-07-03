@@ -54,7 +54,7 @@ class FingerTracker(object):
             cy = int(moment['m01'] / moment['m00'])
             return cx, cy
         else:
-            return None
+            return Non, Nonee
 
     def detect_green(self, camera, hist=None):
         self.x_tcp, self.y_tcp = 50, 50
@@ -104,7 +104,6 @@ class FingerTracker(object):
             ret, thresh = cv2.threshold(gray_mask_image, 0, 255, 0)
             cont, hierarchy = cv2.findContours(thresh, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
 
-            first_cont, second_cont = self.max_contour(cont)
             if first_cont is not None and second_cont is not None:
                 cx1, cy1 = self.centroid(first_cont)
                 cv2.circle(frame, (cx1, cy1), 5, [0, 0, 255], -1)
@@ -129,6 +128,74 @@ class FingerTracker(object):
         plt.show()
         cv2.destroyAllWindows()
         return [self.x_tcp, self.y_tcp], self.list
+
+    def detect_red(self, camera, hist=None):
+        self.x_ref, self.y_ref= 50, 50
+        t0 = time.time()
+        self.min_over_time = np.inf
+        self.list_ref = None
+        while (time.time() - t0) < 20 :
+            print(time.time() - t0)
+            first_cont, second_cont = None, None
+
+            # Take each frame
+            _, frame = camera.get_frame()
+
+            # Convert BGR to HSV
+            frame_bgr = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+            hsv = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2HSV)
+            plt.subplot(2, 2, 1)
+            plt.imshow(frame)
+            plt.subplot(2, 2, 2)
+            plt.imshow(hsv)
+            # # define range for red color in HSV
+            lower_red= np.array([80,70, 50])
+            upper_red= np.array([100,255 , 255])
+
+            # # Threshold the HSV image to get only green colors
+            # mask = cv2.inRange(hsv, lower_green, upper_green)
+            # Threshold the HSV image to get only skin colors
+            if hist is None:
+                mask = cv2.inRange(hsv, lower_red, upper_red)
+                plt.subplot(2, 2, 3)
+                plt.imshow(mask)
+                kernel = np.ones((3, 3), np.uint8)
+                # mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel, iterations=3)
+                mask = cv2.erode(mask, kernel, iterations=3)
+                res = cv2.bitwise_and(frame_bgr, frame_bgr, mask=mask)
+                plt.subplot(2, 2, 4)
+                plt.imshow(mask)
+
+            else:
+                res = self.histMasking(frame, hist)
+            # Bitwise-AND mask and original image
+            gray_mask_image = cv2.cvtColor(res, cv2.COLOR_RGB2GRAY)
+            ret, thresh = cv2.threshold(gray_mask_image, 0, 255, 0)
+            cont, hierarchy = cv2.findContours(thresh, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+
+            first_cont, _ = self.max_contour(cont)
+            
+            if first_cont is not None and (not isinstance(first_cont,tuple)) :
+                cx1, cy1 = self.centroid(first_cont)
+                print((cx1,cy1))
+                cv2.circle(frame, (cx1, cy1), 5, [0, 0, 255], -1)
+
+                self.x_ref, self.y_ref= cx1, cy1
+
+                self.list_ref = [cx1, cy1]
+                frame = hsv 
+                cv2.circle(frame, (self.x_ref, self.y_ref), 5, [0, 0, 255], -1)
+            else:
+                cv2.circle(frame, (self.x_ref, self.y_ref), 5, [0, 0, 255], -1)
+
+            cv2.imshow('frame', frame)
+
+            k = cv2.waitKey(5) & 0xFF
+            if k == 27:
+                break
+        plt.show()
+        cv2.destroyAllWindows()
+        return [self.x_ref, self.y_ref], self.list
 
 
     def get_frame_without_hand(self, camera):
@@ -156,13 +223,11 @@ class FingerTracker(object):
         # x, y, angle, e = 327, 252, -90, 40
         print(x, y, angle, e, 2*e)
         # self.cam.stop_pipe()
-        e = 0.5*e
-        lp = 1.3*e
-        return x, y, angle, e, lp, depth_without_hand, frame_without_hand
+        return x, y, angle, 0.8*e, 1.2*e, depth_without_hand, frame_without_hand
 
 if __name__=="__main__":
     FT = FingerTracker()
-    print(FT.main()[:5])
+    # print(FT.main()[:5])
     # hist = FT.createHistogram()
     # input('Type whatever when you are ready to teach me !')
 
@@ -182,8 +247,13 @@ if __name__=="__main__":
     # TCP_cam = FT.cam.transform_3D(tcp[0], tcp[1], depth_without_hand)
     # P1_cam = FT.cam.transform_3D(fingers[0], fingers[1], depth_without_hand)
     # P2_cam = FT.cam.transform_3D(fingers[2], fingers[3], depth_without_hand)
+    camera = RealCamera()  # Vraiment utile ?
 
-
+    camera.start_pipe()
+    time.sleep(1)
+    camera_param = [camera.intr.fx, camera.intr.fy, camera.intr.ppx, camera.intr.ppy, camera.depth_scale]
+   
+    FT.detect_red(camera) 
     FT.cam.stop_pipe()
 
 
