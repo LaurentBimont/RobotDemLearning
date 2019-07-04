@@ -199,6 +199,80 @@ class FingerTracker(object):
         cv2.destroyAllWindows()
         return [self.x_ref, self.y_ref], self.list_ref
 
+    def detect_blue(self, camera, hist=None):
+        self.x_ref, self.y_ref= 50, 50
+        t0 = time.time()
+        self.min_over_time = np.inf
+        self.list_ref = None
+        while (time.time() - t0) < 50 :
+            print(time.time() - t0)
+            first_cont, second_cont = None, None
+
+            # Take each frame
+            _, frame = camera.get_frame()
+
+            # Convert BGR to HSV
+            frame_bgr = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+            hsv = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2HSV)
+            plt.subplot(2, 2, 1)
+            plt.imshow(frame_bgr)
+            plt.subplot(2, 2, 2)
+            plt.imshow(hsv)
+            # # define range for red color in HSV
+            # blue= cv2.inRange(hsv, np.array([210,100,100]), np.array([255,255,255]))
+            # Blue color
+            low_blue = np.array([0, 150, 0])
+            high_blue = np.array([40, 255, 255])
+            blue_mask = cv2.inRange(hsv, low_blue, high_blue)
+            # # Threshold the HSV image to get only green colors
+            # mask = cv2.inRange(hsv, lower_green, upper_green)
+            # Threshold the HSV image to get only skin colors
+            if hist is None:
+                mask = blue_mask 
+                plt.subplot(2, 2, 3)
+                plt.imshow(mask)
+                kernel = np.ones((3, 3), np.uint8)
+                # mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel, iterations=3)
+                mask = cv2.erode(mask, kernel, iterations=3)
+                res = cv2.bitwise_and(frame_bgr, frame_bgr, mask=mask)
+
+            else:
+                res = self.histMasking(frame, hist)
+            # Bitwise-AND mask and original image
+            gray_mask_image = cv2.cvtColor(res, cv2.COLOR_RGB2GRAY)
+            ret, thresh = cv2.threshold(gray_mask_image, 0, 255, 0)
+            cont, hierarchy = cv2.findContours(thresh, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+
+            conts = self.max_contour(cont)
+            
+            frame = hsv.copy()
+            self.list_ref = []
+            for contour in cont : 
+                if contour is not None :
+                    cx1, cy1 = self.centroid(contour)
+
+                    print((cx1,cy1))
+
+                    if cx1!=None:
+                        cv2.circle(frame, (cx1, cy1), 5, [0, 0, 255], -1)
+
+                        self.x_ref, self.y_ref= cx1, cy1
+
+                        self.list_ref.append((cx1, cy1))
+                        cv2.circle(frame, (self.x_ref, self.y_ref), 5, [0, 0, 255], -1)
+                    else:
+                        cv2.circle(frame, (self.x_ref, self.y_ref), 5, [0, 0, 255], -1)
+
+            cv2.imshow('frame', frame)
+
+            k = cv2.waitKey(5) & 0xFF
+            if k == 27:
+                break
+        plt.show()
+        cv2.destroyAllWindows()
+        return [self.x_ref, self.y_ref], self.list_ref
+
+
 
     def get_frame_without_hand(self, camera):
         self.depth_without_hand, self.frame_without_hand = camera.get_frame()
@@ -255,7 +329,7 @@ if __name__=="__main__":
     time.sleep(1)
     camera_param = [camera.intr.fx, camera.intr.fy, camera.intr.ppx, camera.intr.ppy, camera.depth_scale]
    
-    FT.detect_green(camera) 
+    FT.detect_blue(camera) 
     camera.stop_pipe()
 
 

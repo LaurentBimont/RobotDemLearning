@@ -16,7 +16,7 @@ from trainer import Trainer
 from robot import Robot
 from fingertracking import FingerTracker
 from camera import RealCamera
-
+import experiment
 #########Fonction pour la lisbilité #########
 def get_pred(camera, trainer):
     depth_image, _ = camera.get_frame()
@@ -90,6 +90,9 @@ try:
             explo_depth.append(np.load(f_depth))
             explo_label.append(np.load(f_label))
 
+   eef_point = [] 
+   demonstration_point = []
+   ref_point =[]
 
     while True:
         DO = input('What do you want to do ? (Demo : 1), (Retrained : 2), (grasp : 3), (stop : 4)')
