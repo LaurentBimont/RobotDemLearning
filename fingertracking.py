@@ -134,7 +134,7 @@ class FingerTracker(object):
         t0 = time.time()
         self.min_over_time = np.inf
         self.list_ref = None
-        while (time.time() - t0) < 20 :
+        while (time.time() - t0) < 50 :
             print(time.time() - t0)
             first_cont, second_cont = None, None
 
@@ -156,7 +156,7 @@ class FingerTracker(object):
             # mask = cv2.inRange(hsv, lower_green, upper_green)
             # Threshold the HSV image to get only skin colors
             if hist is None:
-                mask = upper_red 
+                mask = lower_red 
                 plt.subplot(2, 2, 3)
                 plt.imshow(mask)
                 kernel = np.ones((3, 3), np.uint8)
@@ -255,7 +255,7 @@ if __name__=="__main__":
     time.sleep(1)
     camera_param = [camera.intr.fx, camera.intr.fy, camera.intr.ppx, camera.intr.ppy, camera.depth_scale]
    
-    FT.detect_red(camera) 
+    FT.detect_green(camera) 
     camera.stop_pipe()
 
 
