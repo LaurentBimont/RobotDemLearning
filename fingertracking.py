@@ -38,7 +38,7 @@ class FingerTracker(object):
                         max_area = area_cnt
                         second_i = i
                 second_max = contour_list[second_i]
-                if (len(second_max) > 50):
+                if (len(second_max) > 10):
                     return first_max, second_max
                 else:
                     return first_max, None
@@ -61,7 +61,7 @@ class FingerTracker(object):
         self.t0 = time.time()
         self.min_over_time = np.inf
         self.list = None
-        while (time.time() - self.t0) < 5 or self.list is None:
+        while (time.time() - self.t0) < 10 or self.list == None:
             print(time.time() - self.t0)
             first_cont, second_cont = None, None
 
@@ -76,8 +76,8 @@ class FingerTracker(object):
             plt.subplot(2, 2, 2)
             plt.imshow(hsv)
             # # define range for green color in HSV
-            lower_green = np.array([40, 40, 40])
-            upper_green = np.array([90, 250, 250])
+            lower_green = np.array([25, 150, 100])
+            upper_green = np.array([40, 255, 250])
 
             # define range for green color in HSV
             lower_skin = np.array([80, 25, 100], dtype="uint8")
@@ -91,8 +91,8 @@ class FingerTracker(object):
                 plt.subplot(2, 2, 3)
                 plt.imshow(mask)
                 kernel = np.ones((3, 3), np.uint8)
-                # mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel, iterations=3)
-                mask = cv2.erode(mask, kernel, iterations=3)
+                mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel, iterations=1)
+                mask = cv2.erode(mask, kernel, iterations=1)
                 res = cv2.bitwise_and(frame_bgr, frame_bgr, mask=mask)
                 plt.subplot(2, 2, 4)
                 plt.imshow(mask)
@@ -103,6 +103,9 @@ class FingerTracker(object):
             gray_mask_image = cv2.cvtColor(res, cv2.COLOR_RGB2GRAY)
             ret, thresh = cv2.threshold(gray_mask_image, 0, 255, 0)
             cont, hierarchy = cv2.findContours(thresh, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+
+            first_cont, second_cont = self.max_contour(cont)
+
 
             if first_cont is not None and second_cont is not None:
                 cx1, cy1 = self.centroid(first_cont)
@@ -116,9 +119,11 @@ class FingerTracker(object):
                 self.list = [cx1, cy1, cx2, cy2]
 
                 cv2.circle(frame, (self.x_tcp, self.y_tcp), 5, [255, 0, 0], -1)
+
             else:
                 cv2.circle(frame, (self.x_tcp, self.y_tcp), 5, [255, 0, 0], -1)
 
+            cv2.circle(frame, (self.x_ref, self.y_ref), 5, [0, 0, 255], -1)
             cv2.imshow('frame', frame)
             # cv2.imshow('res', res)
 
@@ -134,7 +139,7 @@ class FingerTracker(object):
         t0 = time.time()
         self.min_over_time = np.inf
         self.list_ref = None
-        while (time.time() - t0) < 50 :
+        while (time.time() - t0) < 10 :
             print(time.time() - t0)
             first_cont, second_cont = None, None
 
@@ -187,6 +192,7 @@ class FingerTracker(object):
 
                     self.list_ref = [cx1, cy1]
                     cv2.circle(frame, (self.x_ref, self.y_ref), 5, [0, 0, 255], -1)
+                    cv2.put
             else:
                 cv2.circle(frame, (self.x_ref, self.y_ref), 5, [0, 0, 255], -1)
 
@@ -204,7 +210,7 @@ class FingerTracker(object):
         t0 = time.time()
         self.min_over_time = np.inf
         self.list_ref = None
-        while (time.time() - t0) < 50 :
+        while (time.time() - t0) < 4 :
             print(time.time() - t0)
             first_cont, second_cont = None, None
 
@@ -222,7 +228,7 @@ class FingerTracker(object):
             # blue= cv2.inRange(hsv, np.array([210,100,100]), np.array([255,255,255]))
             # Blue color
             low_blue = np.array([0, 150, 0])
-            high_blue = np.array([40, 255, 255])
+            high_blue = np.array([22, 255, 255])
             blue_mask = cv2.inRange(hsv, low_blue, high_blue)
             # # Threshold the HSV image to get only green colors
             # mask = cv2.inRange(hsv, lower_green, upper_green)
@@ -232,7 +238,7 @@ class FingerTracker(object):
                 plt.subplot(2, 2, 3)
                 plt.imshow(mask)
                 kernel = np.ones((3, 3), np.uint8)
-                # mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel, iterations=3)
+                mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel, iterations=3)
                 mask = cv2.erode(mask, kernel, iterations=3)
                 res = cv2.bitwise_and(frame_bgr, frame_bgr, mask=mask)
 
@@ -245,7 +251,6 @@ class FingerTracker(object):
 
             conts = self.max_contour(cont)
             
-            frame = hsv.copy()
             self.list_ref = []
             for contour in cont : 
                 if contour is not None :
@@ -260,6 +265,11 @@ class FingerTracker(object):
 
                         self.list_ref.append((cx1, cy1))
                         cv2.circle(frame, (self.x_ref, self.y_ref), 5, [0, 0, 255], -1)
+                         
+                        P = camera.transform_3D(cx1,cy1)
+                        d = np.sqrt(np.dot(P,P) )
+
+                        cv2.putText(frame,"{:1.1f} | {:1.1f} | {:1.1f} \n {:1.1f}".format(*P,d),(cx1-5,cy1-5),cv2.FONT_HERSHEY_PLAIN,0.5,(255,255,255))
                     else:
                         cv2.circle(frame, (self.x_ref, self.y_ref), 5, [0, 0, 255], -1)
 
@@ -270,7 +280,7 @@ class FingerTracker(object):
                 break
         plt.show()
         cv2.destroyAllWindows()
-        return [self.x_ref, self.y_ref], self.list_ref
+        return self.list_ref
 
 
 
@@ -329,7 +339,11 @@ if __name__=="__main__":
     time.sleep(1)
     camera_param = [camera.intr.fx, camera.intr.fy, camera.intr.ppx, camera.intr.ppy, camera.depth_scale]
    
+    # list_points = FT.detect_blue(camera) 
     FT.detect_blue(camera) 
+    # test = list_points[0]
+
+
     camera.stop_pipe()
 
 

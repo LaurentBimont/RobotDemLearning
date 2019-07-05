@@ -90,7 +90,7 @@ def postprocess_img( imgs, list_angles):
     resized_imgs = tf.image.resize_images(rimgs, (320, 320))
     return resized_imgs
 
-def postprocess_pred(out, depthimage, camera):
+def postprocess_pred(out, camera):
     out[out < 0] = 0
     zoom_pixel = 50
     plt.subplot(1,2,1)
@@ -113,20 +113,22 @@ def postprocess_pred(out, depthimage, camera):
     origin = [zoom_pixel], [zoom_pixel]
 
     # e = 30
-    e = get_ecartement_pince(sing_val[1], theta, (y_max, x_max), image, camera)
+    theta = py_ang([1, 0], vectors[0])*180/np.pi
+
+    e = get_ecartement_pince(sing_val[1], theta, (y_max, x_max), camera)
     
     return x_max, y_max, theta, e
 
 
-def get_ecartement_pince(vp, theta, center, image, camera):
+def get_ecartement_pince(vp, theta, center, camera):
     sigma = np.sqrt(vp)
     v0, u0 = center
 
-    P0 = camera.transform_3D(u0, v0, image)
+    P0 = camera.transform_3D(u0, v0)
 
     u1 = int(u0 - sigma * np.cos(theta))
     v1 = int(v0 + sigma * np.sin(theta))
-    P1 = camera.transform_3D(u1,v1, image)
+    P1 = camera.transform_3D(u1,v1)
 
     e = np.sqrt((P0-P1).dot(P0-P1))
 

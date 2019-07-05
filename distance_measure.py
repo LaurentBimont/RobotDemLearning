@@ -1,3 +1,3 @@
-from fingertracking import detect_red
+from fingertracking import detect_blue
 
 def compute_distance()
