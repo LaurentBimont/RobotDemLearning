@@ -38,7 +38,7 @@ class FingerTracker(object):
                         max_area = area_cnt
                         second_i = i
                 second_max = contour_list[second_i]
-                if (len(second_max) > 10):
+                if (len(second_max) > 5):
                     return first_max, second_max
                 else:
                     return first_max, None
@@ -61,7 +61,7 @@ class FingerTracker(object):
         self.t0 = time.time()
         self.min_over_time = np.inf
         self.list = None
-        while (time.time() - self.t0) < 10 or self.list == None:
+        while (time.time() - self.t0) <  5 or self.list == None:
             print(time.time() - self.t0)
             first_cont, second_cont = None, None
 
@@ -209,8 +209,8 @@ class FingerTracker(object):
         self.x_ref, self.y_ref= 50, 50
         t0 = time.time()
         self.min_over_time = np.inf
-        self.list_ref = None
-        while (time.time() - t0) < 4 :
+        self.list_ref = [] 
+        while (time.time() - t0) < 1000 and (self.list_ref == [] or len(self.list_ref)!=1) :
             print(time.time() - t0)
             first_cont, second_cont = None, None
 
@@ -227,8 +227,8 @@ class FingerTracker(object):
             # # define range for red color in HSV
             # blue= cv2.inRange(hsv, np.array([210,100,100]), np.array([255,255,255]))
             # Blue color
-            low_blue = np.array([0, 150, 0])
-            high_blue = np.array([22, 255, 255])
+            low_blue = np.array([10, 100, 0])
+            high_blue = np.array([35, 255, 255])
             blue_mask = cv2.inRange(hsv, low_blue, high_blue)
             # # Threshold the HSV image to get only green colors
             # mask = cv2.inRange(hsv, lower_green, upper_green)
@@ -241,7 +241,8 @@ class FingerTracker(object):
                 mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel, iterations=3)
                 mask = cv2.erode(mask, kernel, iterations=3)
                 res = cv2.bitwise_and(frame_bgr, frame_bgr, mask=mask)
-
+                plt.subplot(2, 2, 4)
+                plt.imshow(mask)
             else:
                 res = self.histMasking(frame, hist)
             # Bitwise-AND mask and original image

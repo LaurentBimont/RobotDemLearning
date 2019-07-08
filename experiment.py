@@ -6,32 +6,28 @@ from camera import RealCamera
 
 class Validation():
     def __init__(self):
-        self.list_eef  = []
+        self.list_decision  = []
         self.list_demo = []
         self.list_ref = []
 
-        self.list_drefe = []
-        self.list_dtge = []
+        self.list_dref_demo = []
+        self.list_dref_decision = []
 
-    def compute_distance(self, ref_point, demonstration_point, eef_cart_coordinate):
+    def compute_distance(self, ref_point, demonstration_point, decision_point):
         self.list_ref.append(ref_point)
         self.list_demo.append(demonstration_point)
-        self.list_eef.append( eef_cart_coordinate)
+        self.list_decision.append( decision_point)
 
         #distance projected on the base plane 
-        drefe = (ref_point[:2] - eef_cart_coordinate[:2])
-        drefe = np.sqrt(np.dot(drefe,drefe))
-        self.list_drefe.append(drefe) 
+        dref_decision = (ref_point[:2] - decision_point[:2])
+        dref_decision = np.sqrt(np.dot(dref_decision, dref_decision))
+        self.list_dref_decision.append(dref_decision) 
 
         #distance projected on the base plane 
-        dtge = (ref_point[:2] - demonstration_point[:2])
-        dtge = np.sqrt(np.dot(dtge,dtge))
-        self.list_dtge.append(dtge) 
+        dref_demo= (ref_point[:2] - demonstration_point[:2])
+        dref_demo= np.sqrt(np.dot(dref_demo,dref_demo))
+        self.list_dref_demo.append(dref_demo) 
 
-        dteeftg =  (demonstration_point[:2] - eef_cart_coordinate[:2])
-        dteeftg= np.sqrt(np.dot(dteeftg,dteeftg))
-
-        return drefe, dtge, dteeftg  
 
     def show(self):
         pass

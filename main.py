@@ -16,7 +16,6 @@ from trainer import Trainer
 from robot import Robot
 from fingertracking import FingerTracker
 from camera import RealCamera
-import experiment
 #########Fonction pour la lisbilité #########
 def get_pred(camera, trainer):
     depth_image, _ = camera.get_frame()
@@ -33,7 +32,7 @@ def get_pred(camera, trainer):
     print(out)
     print(np.max(out))
     viz = True
-    x_pred, y_pred, angle_pred, e_pred = div.postprocess_pred(out,  camera)
+    x_pred, y_pred, angle_pred, e_pred = div.postprocess_pred(out, camera)
 
     if viz:
         rect = div.draw_rectangle(e_pred, angle_pred, x_pred, y_pred, 20)
@@ -77,7 +76,7 @@ explo_depth, explo_label = [], []
 try:
     if load:
         demoFileDepth = [join('Experiences/Demonstration/depth/', f) for f in listdir('Experiences/Demonstration/depth/') if
-                         isfile(join('Experiences/Demonstration/depth/', f))]
+                          isfile(join('Experiences/Demonstration/depth/', f))]
         demoFileLabel = [join('Experiences/Demonstration/label/', f) for f in listdir('Experiences/Demonstration/label/') if
                          isfile(join('Experiences/Demonstration/label/', f))]
         for f_depth, f_label in zip(demoFileDepth, demoFileLabel):
@@ -97,95 +96,109 @@ try:
     ref_points =[]
 
 
-    #Find targets on object in the workspace 
-    ref_points = FT.detect_blue(camera)
-    print(ref_points) 
-    depth_image = None
+    # #Find targets on object in the workspace 
+    # ref_points = FT.detect_blue(camera)
+    # print(ref_points) 
+    # depth_image = None
+    def demo(nb_demo):
+        continue_demo = '0'
+        xp_param = []
+        while continue_demo == '0':
+            redo = '0'
+            while redo == '0':
+                x, y, angle, e, lp, depth_image, _ = FT.main(camera)
+                redo = input('Keep that demo ? (Non : 0), (Oui : 1)')
+                label_val_ = input('Quelle type de démo ? (bon:1), (mauvais:2)')
+                if label_val_ == '1':
+                    label_val = 1
+                else:
+                    label_val = -1
+                xp_param.append([x, y, angle, e, lp, label_val])
+                continue_demo = input('Continue demonstrating ? (oui:0) (non:1)')
 
-    while True:
-        DO = input('What do you want to do ? (Demo : 1), (Retrained : 2), (grasp : 3), (stop : 4)')
-        if DO == '1':
-
-            label_plt = [] 
-
-            for point in ref_points:
-                continue_demo = '0'
-                xp_param = []
-                FT.x_ref , FT.y_ref = point 
-                while continue_demo == '0':
-                    redo = '0'
-                    while redo == '0':
-                        x, y, angle, e, lp, depth_image, _ = FT.main(camera)
-                        redo = input('Keep that demo ? (Non : 0), (Oui : 1)')
-                    label_val_ = input('Quelle type de démo ? (bon:1), (mauvais:2)')
-                    if label_val_ == '1':
-                        label_val = 1
-                    else:
-                        label_val = -1
-                    xp_param.append([x, y, angle, e, lp, label_val])
-                    continue_demo = input('Continue demonstrating ? (oui:0) (non:1)')
-                
-                depth_image = div.preprocess_depth_img(depth_image)
-                print(xp_param)
-                label_plt.append(div.compute_labels(xp_param, shape=depth_image.shape))
-                plt.subplot(1, 2, 1)
-                plt.imshow(label_plt[-1])
-                plt.subplot(1, 2, 2)
-                plt.imshow(depth_image)
-                plt.show()
+            depth_image = div.preprocess_depth_img(depth_image)
+            print(xp_param)
+            label_plt=div.compute_labels(xp_param, shape=depth_image.shape)
+            plt.subplot(1, 2, 1)
+            plt.imshow(label_plt)
+            plt.subplot(1, 2, 2)
+            plt.imshow(depth_image)
+            plt.show()
             np.save('Experiences/Demonstration/depth/depth_demo{}.npy'.format(demo), depth_image)
             np.save('Experiences/Demonstration/label/parameters_demo{}.npy'.format(demo), label_plt)
-            demo += 1
             demo_depth.append(depth_image)
             demo_label.append(label_plt)
 
-        elif DO == '2':
-            quefaire = input('Recalculer la DataFrame ? (oui:1), (non : 2)')
-            if quefaire == '1':
-                trainer.exp_rpl.clean()
-                print('Experience Replay reset is finished')
+    def learning():
+        quefaire = input('Recalculer la DataFrame ? (oui:1), (non : 2)')
+        if quefaire == '1':
+            trainer.exp_rpl.clean()
+            print('Experience Replay reset is finished')
 
-                ### Create experience replay ranking
-                for depth, list_label in zip(demo_depth, demo_label):
-                    for label in list_label: 
-                        trainer.main_without_backprop(depth,
-                                                  label,
-                                                  augmentation_factor=3,
-                                                  demo=True)
-                for depth, label in zip(explo_depth, explo_label):
-                    trainer.main_without_backprop(depth,
-                                                  label,
-                                                  augmentation_factor=3,
-                                                  demo=False)
+            ### Create experience replay ranking
+            for depth, label in zip(demo_depth, demo_label):
+                trainer.main_without_backprop(depth,
+                                              label,
+                                              augmentation_factor=3,
+                                              demo=True)
+            for depth, label in zip(explo_depth, explo_label):
+                trainer.main_without_backprop(depth,
+                                              label,
+                                              augmentation_factor=3,
+                                              demo=False)
                 print('starting main training')
-            ### Train with experience replay
-            trainer.main_xpreplay(nb_epoch=2, batch_size=1)
+            ### Train with experienceReplay replay
+        trainer.main_xpreplay(nb_epoch=2, batch_size=1)
 
+    def grasping(trial):
+        x_pred, y_pred, angle_pred, e_pred, depth = get_pred(camera, trainer)
+        print('Parametre du rectangle : ecartement {}, angle {}, x: {}, y: {}, longueur pince {}'.format(e_pred,
+                                                                                                         angle_pred,
+                                                                                                         x_pred,
+                                                                                                         y_pred,
+                                                                                                         20))
+        target_pos = iiwa.from_camera2robot(depth, int(x_pred), int(y_pred), camera_param=camera_param)
+        print('Deplacement du robot à : {} avec pour angle {}'.format(target_pos, angle_pred))
+        grasp_success = iiwa.grasp(target_pos, angle_pred)
+        print('Le grasp a été réussi : ', grasp_success)
+        if grasp_success:
+            label_value = 1
+        else:
+            label_value = -1
+        depth_image = div.preprocess_depth_img(depth)
+        depth_image = resize(depth_image, (224, 224, 3), anti_aliasing=True)
+        label_plt = div.compute_labels([[x_pred, y_pred, angle_pred, 0.5*e_pred, 0.5*1.2*e_pred, label_value]])
+        np.save('Experiences/Exploration/depth/depth_exploration{}.npy'.format(trial), depth_image)
+        np.save('Experiences/Exploration/label/parameters_exploration{}.npy'.format(trial), label_plt)
+        explo_depth.append(depth_image)
+        explo_label.append(label_plt)
+
+    nb_demo = 0
+    trial = 0
+    while True:
+        
+        ref_points = FT.detect_blue(camera) 
+
+        DO = input('What do you want to do ? (Demo : 1), (Retrained : 2), (grasp : 3), (stop : 4)')
+        if DO == '1':
+            demo(nb_demo) 
+            nb_demo+=1 
+        elif DO == '2':
+            learning()
         elif DO == '3':
-            x_pred, y_pred, angle_pred, e_pred, depth = get_pred(camera, trainer)
-            print('Parametre du rectangle : ecartement {}, angle {}, x: {}, y: {}, longueur pince {}'.format(e_pred,
-                                                                                                             angle_pred,
-                                                                                                             x_pred,
-                                                                                                             y_pred,
-                                                                                                             20))
-            target_pos = iiwa.from_camera2robot(depth, int(x_pred), int(y_pred), camera_param=camera_param)
-            print('Deplacement du robot à : {} avec pour angle {}'.format(target_pos, angle_pred))
-            grasp_success = iiwa.grasp(target_pos, angle_pred)
-            print('Le grasp a été réussi : ', grasp_success)
-            if grasp_success:
-                label_value = 1
-            else:
-                label_value = -1
-            depth_image = div.preprocess_depth_img(depth)
-            depth_image = resize(depth_image, (224, 224, 3), anti_aliasing=True)
-            label_plt = div.compute_labels([[x_pred, y_pred, angle_pred, 0.5*e_pred, 0.5*1.2*e_pred, label_value]])
-            np.save('Experiences/Exploration/depth/depth_exploration{}.npy'.format(trial), depth_image)
-            np.save('Experiences/Exploration/label/parameters_exploration{}.npy'.format(trial), label_plt)
-            explo_depth.append(depth_image)
-            explo_label.append(label_plt)
             trial += 1
+            grasping(trial)
+            
         elif DO == '4':
             break
+def validation():
+  demo_point = FT.detect_blue(camera) 
+
+  for nb_demo in range(5):
+      demo(nb_demo, demo_point)
+  learning() 
+   
+
 
 except Exception as e:
     exc_info = sys.exc_info()

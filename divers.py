@@ -115,13 +115,14 @@ def postprocess_pred(out, camera):
     # e = 30
     theta = py_ang([1, 0], vectors[0])*180/np.pi
 
-    e = get_ecartement_pince(sing_val[1], theta, (y_max, x_max), camera)
-    
-    return x_max, y_max, theta, e
+    e_mm = get_ecartement_pince(sing_val[1], theta, (y_max, x_max), camera)
+
+
+    return x_max, y_max, theta, e_mm
 
 
 def get_ecartement_pince(vp, theta, center, camera):
-    sigma = np.sqrt(vp)
+    sigma = 2*np.sqrt(vp)
     v0, u0 = center
 
     P0 = camera.transform_3D(u0, v0)

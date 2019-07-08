@@ -198,7 +198,8 @@ class Trainer(object):
             batch_im, batch_label = self.random_batch(batch_size, dataset)
             self.forward(batch_im)
             self.compute_loss_dem(batch_label, noBackprop=True)
-            self.exp_rpl.store([batch_im, batch_label, self.loss_value])
+            self.exp_rpl.store([batch_im, batch_label, self.loss_value], demo)
+
             if batch % 20 == 0:
                 print('{}/{}'.format(batch, len(dataset['im'])//batch_size))
 

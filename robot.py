@@ -177,7 +177,7 @@ class Robot:
         self.iiwa.movePTPJointSpace(angular_home, 0.50)
         # self.iiwa.movePTPLineEEF(goto, speed, orientationVel=0.5)
 
-    def grasp(self, pos, ang, speed=50):
+    def grasp(self, pos, ang, speed=50,rotate=False):
         angle = div.angle2robotangle(ang)*np.pi/180
         pos[2] = max(pos[2]-60, self.z_min)
         pos[0] += 14
@@ -190,6 +190,10 @@ class Robot:
         self.grip.closeGripper()
         time.sleep(2)
         print('Objet Détectée', self.grip.isObjectDetected())
+        if self.grip.isObjectDetected():
+            jpos = self.iiwa.getJointsPos()
+            jpos[6] = (jpos[6] + 0.4) % np.pi 
+            self.iiwa.movePTPJointSpace(jpos,0.1) 
         self.grip.openGripper()
         self.home()
         return self.grip.isObjectDetected()
