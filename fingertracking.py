@@ -60,8 +60,8 @@ class FingerTracker(object):
         self.x_tcp, self.y_tcp = 50, 50
         self.t0 = time.time()
         self.min_over_time = np.inf
-        self.list = None
-        while (time.time() - self.t0) <  5 or self.list == None:
+        self.list = [] 
+        while (time.time() - self.t0) <  5 and len(self.list) !=2:
             print(time.time() - self.t0)
             first_cont, second_cont = None, None
 

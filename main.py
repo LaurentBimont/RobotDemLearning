@@ -71,63 +71,73 @@ demo, trial = 0, 0
 load = True
 
 ###########################
-demo_depth, demo_label = [], []
-explo_depth, explo_label = [], []
+# demo_depth, demo_label = [], []
+# explo_depth, explo_label = [], []
+
+demo_depth_label = []
+explo_depth_label = []
+
 try:
+    # if load:
+    #     demoFileDepth = [join('Experiences/Demonstration/depth/', f) for f in listdir('Experiences/Demonstration/depth/') if
+    #                       isfile(join('Experiences/Demonstration/depth/', f))]
+    #     demoFileLabel = [join('Experiences/Demonstration/label/', f) for f in listdir('Experiences/Demonstration/label/') if
+    #                      isfile(join('Experiences/Demonstration/label/', f))]
+    #     for f_depth, f_label in zip(demoFileDepth, demoFileLabel):
+    #         demo_depth.append(np.load(f_depth))
+    #         demo_label.append(np.load(f_label))
+
+    #     exploFileDepth = [join('Experiences/Exploration/depth/', f) for f in listdir('Experiences/Exploration/depth/') if
+    #                      isfile(join('Experiences/Exploration/depth/', f))]
+    #     exploFileLabel = [join('Experiences/Exploration/label/', f) for f in listdir('Experiences/Exploration/label/') if
+    #                      isfile(join('Experiences/Exploration/label/', f))]
+    #     for f_depth, f_label in zip(exploFileDepth, exploFileLabel):
+    #         explo_depth.append(np.load(f_depth))
+    #         explo_label.append(np.load(f_label))
+    
     if load:
-        demoFileDepth = [join('Experiences/Demonstration/depth/', f) for f in listdir('Experiences/Demonstration/depth/') if
-                          isfile(join('Experiences/Demonstration/depth/', f))]
-        demoFileLabel = [join('Experiences/Demonstration/label/', f) for f in listdir('Experiences/Demonstration/label/') if
-                         isfile(join('Experiences/Demonstration/label/', f))]
-        for f_depth, f_label in zip(demoFileDepth, demoFileLabel):
-            demo_depth.append(np.load(f_depth))
-            demo_label.append(np.load(f_label))
+        demo_depth_label_file = [join('Experiences/Demonstration/depth_label/', f) for f in listdir('Experiences/Demonstration/depth/') if
+                          isfile(join('Experiences/Demonstration/depth_label/', f))] 
 
-        exploFileDepth = [join('Experiences/Exploration/depth/', f) for f in listdir('Experiences/Exploration/depth/') if
-                         isfile(join('Experiences/Exploration/depth/', f))]
-        exploFileLabel = [join('Experiences/Exploration/label/', f) for f in listdir('Experiences/Exploration/label/') if
-                         isfile(join('Experiences/Exploration/label/', f))]
-        for f_depth, f_label in zip(exploFileDepth, exploFileLabel):
-            explo_depth.append(np.load(f_depth))
-            explo_label.append(np.load(f_label))
+        for f in demo_depth_label_file:
+            demo_depth_label.append(np.load(f))
 
-    eef_point = [] 
-    demonstration_point = []
-    ref_points =[]
+        explo_depth_label_file =  [join('Experiences/Exploration/depth_label/', f) for f in listdir('Experiences/Demonstration/depth/') if
+                                           isfile(join('Experiences/Exploration/depth_label/', f))]
+        for f in demo_depth_label_file:
+            explo_depth_label.append(np.load(f))
 
-
-    # #Find targets on object in the workspace 
+    # #Find targets on object in the workspace
     # ref_points = FT.detect_blue(camera)
     # print(ref_points) 
     # depth_image = None
     def demo(nb_demo):
-        continue_demo = '0'
         xp_param = []
-        while continue_demo == '0':
-            redo = '0'
-            while redo == '0':
-                x, y, angle, e, lp, depth_image, _ = FT.main(camera)
-                redo = input('Keep that demo ? (Non : 0), (Oui : 1)')
-                label_val_ = input('Quelle type de démo ? (bon:1), (mauvais:2)')
-                if label_val_ == '1':
-                    label_val = 1
-                else:
-                    label_val = -1
-                xp_param.append([x, y, angle, e, lp, label_val])
-                continue_demo = input('Continue demonstrating ? (oui:0) (non:1)')
+        x,y = 0,0 
+        redo = '0'
+        while redo == '0':
+            x, y, angle, e, lp, depth_image, _ = FT.main(camera)
+            redo = input('Keep that demo ? (Non : 0), (Oui : 1)')
+        label_val_ = input('Quelle type de démo ? (bon:1), (mauvais:2)')
+        if label_val_ == '1':
+            label_val = 1
+        else:
+            label_val = -1
+        xp_param.append([x, y, angle, e, lp, label_val])
+        
+        depth_image = div.preprocess_depth_img(depth_image)
+        print(xp_param)
+        label_plt=div.compute_labels(xp_param, shape=depth_image.shape)
+        plt.subplot(1, 2, 1)
+        plt.imshow(label_plt)
+        plt.subplot(1, 2, 2)
+        plt.imshow(depth_image)
+        plt.show()
+        np.save('./Experiences/Demonstration/depth_label/depth_parameters_demo{}.npy'.format(demo), (depth_image, label_plt))
 
-            depth_image = div.preprocess_depth_img(depth_image)
-            print(xp_param)
-            label_plt=div.compute_labels(xp_param, shape=depth_image.shape)
-            plt.subplot(1, 2, 1)
-            plt.imshow(label_plt)
-            plt.subplot(1, 2, 2)
-            plt.imshow(depth_image)
-            plt.show()
-            np.save('Experiences/Demonstration/depth/depth_demo{}.npy'.format(demo), depth_image)
-            np.save('Experiences/Demonstration/label/parameters_demo{}.npy'.format(demo), label_plt)
-            demo_depth.append(depth_image)
-            demo_label.append(label_plt)
+        demo_depth_label.append((depth_image, label_plt))
+
+        return x,y
 
     def learning():
         quefaire = input('Recalculer la DataFrame ? (oui:1), (non : 2)')
@@ -136,12 +146,12 @@ try:
             print('Experience Replay reset is finished')
 
             ### Create experience replay ranking
-            for depth, label in zip(demo_depth, demo_label):
+            for depth, label in demo_depth_label:
                 trainer.main_without_backprop(depth,
                                               label,
                                               augmentation_factor=3,
                                               demo=True)
-            for depth, label in zip(explo_depth, explo_label):
+            for depth, label in explo_depth_label:
                 trainer.main_without_backprop(depth,
                                               label,
                                               augmentation_factor=3,
@@ -149,7 +159,7 @@ try:
                 print('starting main training')
             ### Train with experienceReplay replay
         trainer.main_xpreplay(nb_epoch=2, batch_size=1)
-
+        
     def grasping(trial):
         x_pred, y_pred, angle_pred, e_pred, depth = get_pred(camera, trainer)
         print('Parametre du rectangle : ecartement {}, angle {}, x: {}, y: {}, longueur pince {}'.format(e_pred,
@@ -170,36 +180,64 @@ try:
         label_plt = div.compute_labels([[x_pred, y_pred, angle_pred, 0.5*e_pred, 0.5*1.2*e_pred, label_value]])
         np.save('Experiences/Exploration/depth/depth_exploration{}.npy'.format(trial), depth_image)
         np.save('Experiences/Exploration/label/parameters_exploration{}.npy'.format(trial), label_plt)
-        explo_depth.append(depth_image)
-        explo_label.append(label_plt)
+        explo_depth_label.append((depth_image,label_plt))
+        return x_pred, y_pred 
 
-    nb_demo = 0
-    trial = 0
-    while True:
+
+    def proj_dist(p1,p2):
+        d = p1[:2]-p2[:2]
+        d = np.sqrt(np.dot(d,d))
+        return d
+    def validation(camera):
+        nb_demo = 0 
+        nb_trial = 0 
         
-        ref_points = FT.detect_blue(camera) 
+        while True: 
+            try:
+               ref_point = FT.detect_blue(camera)[0]
+               ref_point3D = camera.transform_3D(*ref_point)
 
-        DO = input('What do you want to do ? (Demo : 1), (Retrained : 2), (grasp : 3), (stop : 4)')
-        if DO == '1':
-            demo(nb_demo) 
-            nb_demo+=1 
-        elif DO == '2':
-            learning()
-        elif DO == '3':
-            trial += 1
-            grasping(trial)
+               demo_point = demo(nb_demo)
+               demo_point3D = camera.transform_3D(*demo_point)
+
+               d1 = proj_dist(ref_point3D, demo_point3D)
+               print("distance ref demo : {} ".format(d1))
+
+               learning()
+
+               for i in range(4):
+                   decision_point = grasping(nb_trial)
+                   nb_trial+=1
+                   decision_point3D = camera.transform_3D(*decision_point)
+
+                   d2 = proj_dist(ref_point3D, decision_point3D)
+                   
+                   print("distance ref demo : {} ".format(d1))
+                   print("distance ref decision : {} ".format(d2)) 
+
+            except KeyboardInterrupt:
+                print("fin programme")
+
+    # nb_demo = 0
+    # trial = 0
+    # while True:
+        
+    #     ref_points = FT.detect_blue(camera) 
+
+    #     DO = input('What do you want to do ? (Demo : 1), (Retrained : 2), (grasp : 3), (stop : 4)')
+    #     if DO == '1':
+    #         demo(nb_demo) 
+    #         nb_demo+=1 
+    #     elif DO == '2':
+    #         learning()
+    #     elif DO == '3':
+    #         trial += 1
+    #         grasping(trial)
             
-        elif DO == '4':
-            break
-def validation():
-  demo_point = FT.detect_blue(camera) 
+    #     elif DO == '4':
+    #         break
 
-  for nb_demo in range(5):
-      demo(nb_demo, demo_point)
-  learning() 
-   
-
-
+    validation(camera) 
 except Exception as e:
     exc_info = sys.exc_info()
     traceback.print_exception(*exc_info)
@@ -208,6 +246,8 @@ except Exception as e:
 finally: 
     iiwa.iiwa.close()
     camera.stop_pipe()
+
+
 
 ########## Execution ##########
 

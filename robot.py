@@ -192,7 +192,7 @@ class Robot:
         print('Objet Détectée', self.grip.isObjectDetected())
         if self.grip.isObjectDetected():
             jpos = self.iiwa.getJointsPos()
-            jpos[6] = (jpos[6] + 0.4) % np.pi 
+            jpos[6] = (jpos[6] + 0.4) % (np.pi/2)
             self.iiwa.movePTPJointSpace(jpos,0.1) 
         self.grip.openGripper()
         self.home()
