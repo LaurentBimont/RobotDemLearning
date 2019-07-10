@@ -98,7 +98,7 @@ def postprocess_pred(out, camera):
 
     (y_max, x_max) = np.unravel_index(out[:, :, 1].argmax(), out[:, :, 1].shape)
     ####### REMARQUE quand le max pixel est a moins de 50 des bords, ca buggue ######
-    test_pca = out[y_max-zoom_pixel:y_max+zoom_pixel, x_max-zoom_pixel:x_max+zoom_pixel, 1]
+    test_pca = out[max(y_max-zoom_pixel,0):min(y_max+zoom_pixel, out.shape[0]), max(x_max-zoom_pixel,0):min(x_max+zoom_pixel,out.shape[1]), 1]
     plt.subplot(1,2,2)
     plt.imshow(test_pca)
     plt.show()
