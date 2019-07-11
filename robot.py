@@ -174,6 +174,8 @@ class Robot:
         home = [595, 15.9, 353, 1.60, 0, 2.77] # Orientation camera vers l'arrière
         goto = [383, -2.13, 250, -1.63, 0, 2.72] # Orientation camera vers l'avant
         angular_home = [0.19611477, 0.430804, -0.30726947, -1.47291056, 0.10567891, 1.67921869, -1.63443118]
+        # angular_home = [ 0.22088622,  0.660586  , -0.30721297, -1.63273026,  0.19087189,
+        # 1.30512739, -1.66725927] 
         self.iiwa.movePTPJointSpace(angular_home, 0.50)
         # self.iiwa.movePTPLineEEF(goto, speed, orientationVel=0.5)
 

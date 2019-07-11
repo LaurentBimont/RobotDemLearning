@@ -37,7 +37,7 @@ def angle2robotangle(angle):
         angle -= 180
     elif angle < -90:
         print(2)
-        angle += 180
+        # angle += 180
     angle -= 180
 
     return angle
@@ -112,13 +112,13 @@ def postprocess_pred(out, camera):
     np.linalg.norm(pca.singular_values_)
     origin = [zoom_pixel], [zoom_pixel]
 
-    # e = 30
+    e = 30
     theta = py_ang([1, 0], vectors[0])*180/np.pi
 
-    e_mm = get_ecartement_pince(sing_val[1], theta, (y_max, x_max), camera)
+    # e_mm = get_ecartement_pince(sing_val[1], theta, (y_max, x_max), camera)
 
 
-    return x_max, y_max, theta, e_mm
+    return x_max, y_max, theta, e
 
 
 def get_ecartement_pince(vp, theta, center, camera):

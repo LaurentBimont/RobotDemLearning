@@ -61,7 +61,7 @@ class FingerTracker(object):
         self.t0 = time.time()
         self.min_over_time = np.inf
         self.list = [] 
-        while (time.time() - self.t0) <  5 and len(self.list) !=2:
+        while (time.time() - self.t0) <  5 or len(self.list) ==0:
             print(time.time() - self.t0)
             first_cont, second_cont = None, None
 
@@ -109,16 +109,18 @@ class FingerTracker(object):
 
             if first_cont is not None and second_cont is not None:
                 cx1, cy1 = self.centroid(first_cont)
-                cv2.circle(frame, (cx1, cy1), 5, [0, 0, 255], -1)
+                if cx1!= None: 
+                    cv2.circle(frame, (cx1, cy1), 5, [0, 0, 255], -1)
+                 
+                    cx2, cy2 = self.centroid(second_cont)
+                    if cx2 !=None:
+                        cv2.circle(frame, (cx2, cy2), 5, [0, 255, 0], -1)
 
-                cx2, cy2 = self.centroid(second_cont)
-                cv2.circle(frame, (cx2, cy2), 5, [0, 255, 0], -1)
+                        self.x_tcp, self.y_tcp = (cx1 + cx2) // 2, (cy1 + cy2) // 2
+                        self.min_over_time = div.get_ecartement([cx1, cy1, cx2, cy2])
+                        self.list = [cx1, cy1, cx2, cy2]
 
-                self.x_tcp, self.y_tcp = (cx1 + cx2) // 2, (cy1 + cy2) // 2
-                self.min_over_time = div.get_ecartement([cx1, cy1, cx2, cy2])
-                self.list = [cx1, cy1, cx2, cy2]
-
-                cv2.circle(frame, (self.x_tcp, self.y_tcp), 5, [255, 0, 0], -1)
+                        cv2.circle(frame, (self.x_tcp, self.y_tcp), 5, [255, 0, 0], -1)
 
             else:
                 cv2.circle(frame, (self.x_tcp, self.y_tcp), 5, [255, 0, 0], -1)
@@ -129,7 +131,8 @@ class FingerTracker(object):
 
             k = cv2.waitKey(5) & 0xFF
             if k == 27:
-                break
+                return [self.x_tcp, self.y_tcp], self.list
+
         plt.show()
         cv2.destroyAllWindows()
         return [self.x_tcp, self.y_tcp], self.list
@@ -310,7 +313,7 @@ class FingerTracker(object):
         # x, y, angle, e = 327, 252, -90, 40
         print(x, y, angle, e, 2*e)
         # self.cam.stop_pipe()
-        return x, y, angle, 0.4*e, 0.8*e, depth_without_hand, frame_without_hand
+        return x, y, angle, 0.8*e, 1.2*e, depth_without_hand, frame_without_hand
 
 if __name__=="__main__":
     FT = FingerTracker()

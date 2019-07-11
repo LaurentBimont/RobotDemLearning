@@ -73,7 +73,7 @@ def demo(nb_demo):
     plt.subplot(1, 2, 2)
     plt.imshow(depth_image)
     plt.show()
-    np.save('./Experiences/Demonstration/depth_label/depth_parameters_demo{}.npy'.format(demo), (depth_image, label_plt))
+    np.save('./Experiences/Demonstration/depth_label/depth_parameters_demo{}.npy'.format(nb_demo), (depth_image, label_plt))
 
     demo_depth_label.append((depth_image, label_plt))
 
@@ -100,7 +100,7 @@ def learning():
         ### Train with experienceReplay replay
     trainer.main_xpreplay(nb_epoch=2, batch_size=1)
 
-def grasping(trial):
+def grasping(nb_trial):
     x_pred, y_pred, angle_pred, e_pred, depth = get_pred(camera, trainer)
     print('Parametre du rectangle : ecartement {}, angle {}, x: {}, y: {}, longueur pince {}'.format(e_pred,
                                                                                                         angle_pred,
@@ -118,10 +118,13 @@ def grasping(trial):
     depth_image = div.preprocess_depth_img(depth)
     depth_image = resize(depth_image, (224, 224, 3), anti_aliasing=True)
     label_plt = div.compute_labels([[x_pred, y_pred, angle_pred, 0.5*e_pred, 0.5*1.2*e_pred, label_value]])
-    np.save('Experiences/Exploration/depth_label/depth_parameters_exploration{}.npy'.format(trial), (depth_image, label_plt))
+    np.save('Experiences/Exploration/depth_label/depth_parameters_exploration{}.npy'.format(nb_trial), (depth_image, label_plt))
 
     explo_depth_label.append((depth_image,label_plt))
-    return x_pred, y_pred 
+
+
+
+    return x_pred, y_pred
 
 
 def proj_dist(p1,p2):
@@ -135,28 +138,32 @@ def validation(camera):
     
     while True: 
         try:
-            # ref_point = FT.detect_blue(camera)[0]
-            # ref_point3D = camera.transform_3D(*ref_point)
+            ref_point = FT.detect_blue(camera)[0]
+            ref_point3D = camera.transform_3D(*ref_point)
+             
+            for i in range(2): 
+                demo_point = demo(nb_demo)
+                demo_point3D = camera.transform_3D(*demo_point)
+                nb_demo+=1 
+            d1 = proj_dist(ref_point3D, demo_point3D)
+            print("distance ref demo : {} ".format(d1))
 
-            # for i in range(3): 
-            #     demo_point = demo(nb_demo)
-            #     demo_point3D = camera.transform_3D(*demo_point)
-
-            # d1 = proj_dist(ref_point3D, demo_point3D)
-            # print("distance ref demo : {} ".format(d1))
-
-            # learning()
+            learning()
 
             for i in range(4):
+                ref_point = FT.detect_blue(camera)[0]
+                ref_point3D = camera.transform_3D(*ref_point)
+
                 decision_point = grasping(nb_trial)
                 nb_trial+=1
                 decision_point3D = camera.transform_3D(*decision_point)
 
-                # d2 = proj_dist(ref_point3D, decision_point3D)
-
-                # print("distance ref demo : {} ".format(d1))
-                # print("distance ref decision : {} ".format(d2)) 
-
+                d2 = proj_dist(ref_point3D, decision_point3D)
+                with open("distance.csv","w+") as f: 
+                    print("distance ref demo : {} ".format(d1))
+                    print("distance ref decision : {} ".format(d2)) 
+                    line = ";".join(map(str, [d1,d2,abs(d1-d2),"\n"])) 
+                    f.write(line)
         except KeyboardInterrupt:
             print("fin programme")
 
@@ -199,7 +206,7 @@ if __name__=="__main__":
 
             explo_depth_label_file =  [join('Experiences/Exploration/depth_label/', f) for f in listdir('Experiences/Exploration/depth_label/') if
                                             isfile(join('Experiences/Exploration/depth_label/', f))]
-            for f in demo_depth_label_file:
+            for f in explo_depth_label_file:
                 explo_depth_label.append(np.load(f))
 
         validation(camera)
@@ -209,6 +216,13 @@ if __name__=="__main__":
         traceback.print_exception(*exc_info)
         del exc_info
         pass
+    except RuntimeError as e:
+        exc_info = sys.exc_info()
+        traceback.print_exception(*exc_info)
+
+        iiwa.iiwa.close()
+        camera.stop_pipe()
+
     finally: 
         iiwa.iiwa.close()
         camera.stop_pipe()
