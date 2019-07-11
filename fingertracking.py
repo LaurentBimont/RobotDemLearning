@@ -109,16 +109,17 @@ class FingerTracker(object):
 
             if first_cont is not None and second_cont is not None:
                 cx1, cy1 = self.centroid(first_cont)
-                cv2.circle(frame, (cx1, cy1), 5, [0, 0, 255], -1)
+                if cx1!= None: 
+                    cv2.circle(frame, (cx1, cy1), 5, [0, 0, 255], -1)
+                    
+                    cx2, cy2 = self.centroid(second_cont)
+                    cv2.circle(frame, (cx2, cy2), 5, [0, 255, 0], -1)
 
-                cx2, cy2 = self.centroid(second_cont)
-                cv2.circle(frame, (cx2, cy2), 5, [0, 255, 0], -1)
+                    self.x_tcp, self.y_tcp = (cx1 + cx2) // 2, (cy1 + cy2) // 2
+                    self.min_over_time = div.get_ecartement([cx1, cy1, cx2, cy2])
+                    self.list = [cx1, cy1, cx2, cy2]
 
-                self.x_tcp, self.y_tcp = (cx1 + cx2) // 2, (cy1 + cy2) // 2
-                self.min_over_time = div.get_ecartement([cx1, cy1, cx2, cy2])
-                self.list = [cx1, cy1, cx2, cy2]
-
-                cv2.circle(frame, (self.x_tcp, self.y_tcp), 5, [255, 0, 0], -1)
+                    cv2.circle(frame, (self.x_tcp, self.y_tcp), 5, [255, 0, 0], -1)
 
             else:
                 cv2.circle(frame, (self.x_tcp, self.y_tcp), 5, [255, 0, 0], -1)

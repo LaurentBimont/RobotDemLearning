@@ -135,27 +135,27 @@ def validation(camera):
     
     while True: 
         try:
-            # ref_point = FT.detect_blue(camera)[0]
-            # ref_point3D = camera.transform_3D(*ref_point)
+            ref_point = FT.detect_blue(camera)[0]
+            ref_point3D = camera.transform_3D(*ref_point)
 
-            # for i in range(3): 
-            #     demo_point = demo(nb_demo)
-            #     demo_point3D = camera.transform_3D(*demo_point)
+            for i in range(3): 
+                demo_point = demo(nb_demo)
+                demo_point3D = camera.transform_3D(*demo_point)
 
-            # d1 = proj_dist(ref_point3D, demo_point3D)
-            # print("distance ref demo : {} ".format(d1))
+            d1 = proj_dist(ref_point3D, demo_point3D)
+            print("distance ref demo : {} ".format(d1))
 
-            # learning()
+            learning()
 
             for i in range(4):
                 decision_point = grasping(nb_trial)
                 nb_trial+=1
                 decision_point3D = camera.transform_3D(*decision_point)
 
-                # d2 = proj_dist(ref_point3D, decision_point3D)
+                d2 = proj_dist(ref_point3D, decision_point3D)
 
-                # print("distance ref demo : {} ".format(d1))
-                # print("distance ref decision : {} ".format(d2)) 
+                print("distance ref demo : {} ".format(d1))
+                print("distance ref decision : {} ".format(d2)) 
 
         except KeyboardInterrupt:
             print("fin programme")
