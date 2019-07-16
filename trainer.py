@@ -38,26 +38,32 @@ class Trainer(object):
         # self.create_log()
         self.exp_rpl = ExperienceReplay(["depth_heightmap", "label", "loss"])
         # Frequency
-        self.viz_frequency = 20
-        self.saving_frequency = 50
+        self.viz_frequency = 25
+        self.saving_frequency = 199
         
         # Initiate logger
         self.create_log()
+        checkpoint_directory = "checkpoint_1"
 
         if savetosnapshot:
-            checkpoint_directory = "checkpoint_1"
             self.snapshot_file = os.path.join(checkpoint_directory, snapshot_file)
             self.checkpoint = tf.train.Checkpoint(optimizer=self.optimizer, model=self.myModel,
                                                   optimizer_step=tf.train.get_or_create_global_step())
-            if load:
-                latest_snapshot_file = tf.train.latest_checkpoint(checkpoint_directory)
-                status = self.checkpoint.restore(latest_snapshot_file)
-                print('Pre-trained model snapshot loaded from: {}'.format(latest_snapshot_file))
-            else:
-                self.checkpoint.save(self.snapshot_file)
-                print('Creating snapshot : {}'.format(self.snapshot_file))
+            self.checkpoint.save(self.snapshot_file)
+            print('Creating snapshot : {}'.format(self.snapshot_file))
 
-        self.loss = func.partial(tf.losses.huber_loss)
+        if load:
+            latest_snapshot_file = tf.train.latest_checkpoint(checkpoint_directory)
+            status = self.checkpoint.restore(latest_snapshot_file)
+            print('Pre-trained model snapshot loaded from: {}'.format(latest_snapshot_file))
+        # else:
+
+
+        self.loss = tf.losses.huber_loss
+        flat_logits = tf.reshape(tensor=upsampled_logits, shape=(-1, number_of_classes))
+
+        cross_entropies = tf.nn.softmax_cross_entropy_with_logits(logits=flat_logits,
+                                                                  labels=flat_labels)
         ######                     Demonstration                            ######
         self.best_idx = [125, 103]
 
@@ -86,12 +92,17 @@ class Trainer(object):
         label = self.reduced_label(label)
 
         new_lab, label_numpy = self.output_prob.numpy(), label.numpy()
-        # plt.subplot(1, 4, 1)
-        # plt.imshow(label_numpy[0, :, :, 0])
-        # plt.subplot(1, 4, 2)
-        # plt.imshow(new_lab[0, :, :, 0])
+        weight = np.zeros(label_numpy.shape)
+        weight[label_numpy != 0] = 1
+        weight[label_numpy == 0] = 0
+
+        new_lab *= 0.8
         new_lab[label_numpy == 1] = 1
         new_lab[label_numpy == -1] = 0
+
+        out_num = self.output_prob.numpy()[0, :, :, 0]
+        x_max, y_max = np.argmax(np.max(out_num, axis=1)), np.argmax(np.max(out_num, axis=0))
+        x_target, y_target = np.argmax(np.max(label_numpy, axis=1)), np.argmax(np.max(label_numpy, axis=0))
         # new_lab[label_numpy != 1] /= 2
         # plt.subplot(1, 4, 3)
         # plt.imshow(new_lab[0, :, :, 0])
@@ -105,7 +116,9 @@ class Trainer(object):
         # plt.imshow(self.output_prob[0, :, :, 0], vmin=0, vmax=1)
         # plt.show()
         # self.loss_value = self.loss(label, self.output_prob, reduction=tf.losses.Reduction.SUM)
-        self.loss_value = self.loss(label, self.output_prob)
+
+        self.loss_value = self.loss(label, self.output_prob, weight) # + (x_max-x_target)**2 + (y_max-y_target)**2
+        print('La valeur de perte : {}'.format(self.loss_value.numpy()))
         # print('La valeur de perte est {}'.format(self.loss_value.numpy()))
         # Tensorboard ouputs
 
@@ -113,8 +126,19 @@ class Trainer(object):
                 and (tf.train.get_global_step().numpy() % self.viz_frequency == 0) \
                 and (not noBackprop):
             print('Printing to Tensorboard')
-            img_tensorboard = self.prediction_viz(3*self.output_prob, self.image)
-            img_tensorboard_target = self.prediction_viz(label.numpy(), self.image)
+
+            # plt.subplot(1, 3, 1)
+            # plt.imshow(label_numpy[0, :, :, 0])
+            # plt.subplot(1, 3, 2)
+            # plt.imshow(new_lab[0, :, :, 0], vmin=0, vmax=1)
+            # plt.scatter(y_max, x_max, color='red')
+            # plt.subplot(1, 3, 3)
+            # plt.imshow(self.output_prob.numpy()[0, :, :, 0], vmin=0, vmax=1)
+            # plt.scatter(y_max, x_max, color='red')
+            # plt.show()
+
+            img_tensorboard = self.prediction_viz(self.output_prob, self.image)
+            img_tensorboard_target = self.prediction_viz(new_lab, self.image)
             subplot_viz = self.draw_scatter_subplot(img_tensorboard, img_tensorboard_target)
             self.log_fig('subplot_viz', subplot_viz)
             self.log_img('input', self.image)
@@ -125,10 +149,11 @@ class Trainer(object):
                 and (tf.train.get_global_step() is not None)\
                 and (tf.train.get_global_step().numpy()%self.saving_frequency == 0)\
                 and (not noBackprop):
+
             self.save_model()
         return self.loss_value
 
-    def compute_labels(self, label_value, best_pix_ind, shape=(224,224,3), viz=False):
+    def compute_labels(self, label_value, best_pix_ind, shape=(224,224,3), viz=True):
         '''Create the targeted Q-map
         :param label_value: Reward of the action
         :param best_pix_ind: (Rectangle Parameters : x(colonne), y(ligne), angle(en degré), ecartement(en pixel)) Pixel where to perform the action
@@ -139,16 +164,18 @@ class Trainer(object):
         x, y, angle, e, lp = best_pix_ind
         rect = div.draw_rectangle(e, angle, x, y, lp)
         label = np.zeros(shape, dtype=np.float32)
-        cv2.fillConvexPoly(label, rect, color=1)
 
+        cv2.fillConvexPoly(label, rect, color=1)
         label *= label_value
+
         if viz:
-            plt.subplot(1, 3, 1)
+            plt.subplot(1, 2, 1)
             self.image = np.reshape(self.image, (self.image.shape[1], self.image.shape[2], 3))
             plt.imshow(self.image)
-            plt.subplot(1, 3, 2)
-            label_viz = np.reshape(label, (label.shape[0], label.shape[1]))
-            plt.imshow(label_viz)
+            plt.subplot(1, 2, 2)
+            label_viz = np.reshape(label, (224, 224, 3))
+            plt.imshow(label)
+            plt.show()
         return label
 
     def reduced_label(self, label):
@@ -192,23 +219,22 @@ class Trainer(object):
         # plt.imshow(label[:, :, 0])
         # plt.show()
         print('Data Augmentation')
-        dataset = da.OnlineAugmentation().generate_batch(im, label, np.mean(im), viz=False, augmentation_factor=augmentation_factor)
+        self.dataset = da.OnlineAugmentation().generate_batch(im, label, np.mean(im), viz=False, augmentation_factor=augmentation_factor)
 
-        for batch in range(len(dataset['im'])//batch_size):
-            batch_im, batch_label = self.random_batch(batch_size, dataset)
+        for batch in range(len(self.dataset['im'])//batch_size):
+            batch_im, batch_label = self.random_batch(batch_size, self.dataset)
             self.forward(batch_im)
             self.compute_loss_dem(batch_label, noBackprop=True)
             self.exp_rpl.store([batch_im, batch_label, self.loss_value], demo)
-
             if batch % 20 == 0:
-                print('{}/{}'.format(batch, len(dataset['im'])//batch_size))
+                print('{}/{}'.format(batch, len(self.dataset['im'])//batch_size))
 
     def main_xpreplay(self, nb_epoch=2, batch_size=3):
         self.exp_rpl.generate_ranking()
         for epoch in range(nb_epoch):
-            for batch in range(100):
+            for batch in range(200):
                 if batch % 20 == 0:
-                    print('Epoch {}/{}, Batch {}/{}'.format(epoch + 1, nb_epoch, batch + 1, 100))
+                    print('Epoch {}/{}, Batch {}/{}'.format(epoch + 1, nb_epoch, batch + 1, 200))
                 batch_im, batch_lab = self.exp_rpl.replay(batch_size=batch_size)
                 self.main_batches(batch_im, batch_lab)
 
@@ -222,23 +248,24 @@ class Trainer(object):
         batch_im, batch_lab = tf.stack(batch_tmp_im), tf.stack(batch_tmp_lab)
         return batch_im, batch_lab
 
-    def main(self, best_pix, im, epoch_size=1, batch_size=1, augmentation_factor=4):
-        # label = self.compute_labels(1, best_pix, shape=im.shape)
-        label = best_pix
+    def main(self, best_pix, im, epoch_size=3, batch_size=1, augmentation_factor=4):
+        label = self.compute_labels(1, best_pix)
+        # label = best_pix
         plt.subplot(1, 2, 1)
         plt.imshow(label)
         plt.subplot(1, 2, 2)
-        plt.imshow(im)
+        plt.imshow(im[0, :, :, :])
         plt.show()
+        im = im[0, :, :, :]
+        label = label
         im = resize(im, (224, 224, 3), anti_aliasing=True)
         label = resize(label, (224, 224, 3), anti_aliasing=True)
-        dataset = da.OnlineAugmentation().generate_batch(im, label, np.mean(im), viz=False, augmentation_factor=augmentation_factor)
+        dataset = da.OnlineAugmentation().generate_batch(im, label, np.min(im), viz=False, augmentation_factor=augmentation_factor)
         for epoch in range(epoch_size):
             for batch in range(len(dataset['im']) // batch_size):
                 print('Epoch {}/{}, Batch {}/{}'.format(epoch + 1, epoch_size, batch + 1,
                                                         len(dataset['im']) // batch_size))
                 batch_im, batch_lab = self.random_batch(batch_size, dataset)
-                print('LAAAA')
                 # plt.subplot(1,2,1)
                 # plt.imshow(batch_lab.numpy()[0,:,:,0])
                 # plt.subplot(1, 2, 2)
@@ -261,17 +288,19 @@ class Trainer(object):
         self.checkpoint.save(self.snapshot_file)
 
     def prediction_viz(self, qmap, im):
-        qmap1 = qmap
         qmap = qmap[0, :, :, :]
         qmap = tf.image.resize_images(qmap, (self.width, self.height))
         qmap = tf.image.resize_images(qmap, (224, 224), method=tf.image.ResizeMethod.NEAREST_NEIGHBOR)
         qmap = tf.reshape(qmap, (224, 224))
-
+        x_map, y_map = np.argmax(np.max(qmap, axis=1)), np.argmax(np.max(qmap, axis=0))
         rescale_qmap = qmap
         img = np.zeros((224, 224, 3))
-        img[:, :, 0] = im[0, :, :, 0]
+        img[:, :, 0] = im[0, :, :, 0]/np.max(im[0, :, :, 0])
         img[:, :, 1] = rescale_qmap
+        img[x_map-5:x_map+5, y_map-5:y_map+5, 2] = 1
         img = img / np.max(img)
+        # plt.imshow(img)
+        # plt.show()
         return img
 
 #### For Tensorboard #####
@@ -337,7 +366,6 @@ class Trainer(object):
             except:
                 pass
 
-
 if __name__=='__main__':
     Network = Trainer(savetosnapshot=False, load=True, snapshot_file='reference')
     im = np.zeros((1, 224, 224, 3), np.float32)
@@ -345,7 +373,7 @@ if __name__=='__main__':
     im[:, 70:80, 80:125, :] = 1
 
     best_pix = [103, 125, 0, 40, 10]
-    best_pix = [83, 76, 0, 20, 10]         # x, y, angle, e, lp
+    best_pix = [83, 76, 0, 30, 10]         # x, y, angle, e, lp
 
     out = Network.forward(im)
     viz = Network.prediction_viz(out, im)
@@ -360,13 +388,12 @@ if __name__=='__main__':
         x, y, angle, e, lp = best_pix[0], best_pix[1], best_pix[2], best_pix[3], best_pix[4]
         rect = div.draw_rectangle(e, angle, x, y, lp)
         im_test = np.zeros((224, 224, 3))
-        im_test[:, :, 1] = im[:, :, 0]
+        im_test[:, :, 1] = im[0, :, :, 0]
         demo = cv2.fillConvexPoly(im_test, rect, color=3)
         plt.imshow(demo)
         plt.show()
 
     Network.main(best_pix, im)
-
     #
     im = np.zeros((1, 224, 224, 3), np.float32)
     im[:, 70:190, 100:105, :] = 1

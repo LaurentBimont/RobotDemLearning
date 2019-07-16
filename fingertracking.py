@@ -57,6 +57,7 @@ class FingerTracker(object):
             return None, None
 
     def detect_green(self, camera, hist=None):
+        self.x_ref, self.y_ref= 50, 50
         self.x_tcp, self.y_tcp = 50, 50
         self.t0 = time.time()
         self.min_over_time = np.inf
@@ -105,7 +106,6 @@ class FingerTracker(object):
             cont, hierarchy = cv2.findContours(thresh, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
 
             first_cont, second_cont = self.max_contour(cont)
-
 
             if first_cont is not None and second_cont is not None:
                 cx1, cy1 = self.centroid(first_cont)

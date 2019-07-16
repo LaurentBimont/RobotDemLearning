@@ -34,6 +34,7 @@ class OnlineAugmentation(object):
         if type(im).__module__ == np.__name__:
             # If it is a numpy array
             im = np.reshape(im, (224, 224, 3))
+        print(label.shape, im.shape)
         my_batch = [im, label]
         self.batch = tf.stack(my_batch)
 
@@ -144,14 +145,9 @@ class OnlineAugmentation(object):
         h = 1
         print('taille image diametre ', im.shape)
         print('Facteur da ', augmentation_factor)
-        plt.imshow(label)
-        plt.show()
         for i in range(augmentation_factor):
-            print(1)
             ima, lab = self.crop(im, label, zooming=np.random.randint(100, 200))
-
             if self.assert_label(lab):
-                print(2)
                 for j in range(augmentation_factor):
                     ima, lab = self.translate(ima, lab, mini,
                                                      pad_top=np.random.randint(0, 50),

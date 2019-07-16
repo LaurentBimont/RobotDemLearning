@@ -43,15 +43,18 @@ def angle2robotangle(angle):
     return angle
 
 def preprocess_depth_img(depth_image):
-    depth_image[depth_image > 0.55] = 0
+    # depth_image[depth_image > 0.55] = 0 Commenté le 16 juillet
+    depth_image[depth_image > 0.45] = 0  # Rajouté le 16 juillet
     depth_image[depth_image < 0.35] = 0
-    depth_image[depth_image == 0] = np.mean(depth_image[depth_image != 0])
+    # depth_image[depth_image == 0] = np.mean(depth_image[depth_image != 0])  Commenté le 16 juillet
+    depth_image[depth_image == 0] = np.max(depth_image[depth_image != 0])
     print('C est par la', np.max(depth_image), np.min(depth_image), np.mean(depth_image))
     min = second_min(depth_image.flatten())
+    mini = np.min(depth_image.flatten())
     print('Le deuxième minimum est ', min)
     plt.subplot(1, 3, 1)
     plt.imshow(depth_image)
-    depth_image = np.ones(depth_image.shape) - (depth_image - min) / (depth_image.max() - min)
+    depth_image = np.ones(depth_image.shape) - (depth_image - mini) / (depth_image.max() - mini)
     plt.subplot(1, 3, 2)
     plt.imshow(depth_image)
     # depth_image[depth_image > 1] = 0
@@ -92,16 +95,11 @@ def postprocess_img( imgs, list_angles):
 
 def postprocess_pred(out, camera):
     out[out < 0] = 0
-    zoom_pixel = 50
-    plt.subplot(1,2,1)
-    plt.imshow(out)
+    zoom_pixel = 100
 
     (y_max, x_max) = np.unravel_index(out[:, :, 1].argmax(), out[:, :, 1].shape)
     ####### REMARQUE quand le max pixel est a moins de 50 des bords, ca buggue ######
-    test_pca = out[max(y_max-zoom_pixel,0):min(y_max+zoom_pixel, out.shape[0]), max(x_max-zoom_pixel,0):min(x_max+zoom_pixel,out.shape[1]), 1]
-    plt.subplot(1,2,2)
-    plt.imshow(test_pca)
-    plt.show()
+    test_pca = out[max(y_max-zoom_pixel, 0):min(y_max+zoom_pixel, out.shape[0]), max(x_max-zoom_pixel, 0):min(x_max+zoom_pixel, out.shape[1]), 1]
     PointCloud = heatmap2pointcloud(test_pca)
     pca = PCA()
     pca.fit(PointCloud)
@@ -111,13 +109,9 @@ def postprocess_pred(out, camera):
     vectors[1] *= sing_val[1]
     np.linalg.norm(pca.singular_values_)
     origin = [zoom_pixel], [zoom_pixel]
-
     e = 30
     theta = py_ang([1, 0], vectors[0])*180/np.pi
-
     # e_mm = get_ecartement_pince(sing_val[1], theta, (y_max, x_max), camera)
-
-
     return x_max, y_max, theta, e
 
 
@@ -197,14 +191,20 @@ def compute_labels(best_pix_ind, shape=(224,224,3), viz=False):
     '''
     label = np.zeros(shape, dtype=np.float32)
     for i in range(len(best_pix_ind)):
-    # Compute labels
         label_temp = np.zeros(shape, dtype=np.float32)
         x, y, angle, e, lp, label_val = best_pix_ind[i]
+        print(best_pix_ind[i])
         rect = draw_rectangle(e, angle, x, y, lp)
-        cv2.fillConvexPoly(label_temp, rect, color=1)
-        label[np.where(label_temp == 1)] = label_val
-
+        cv2.fillConvexPoly(label_temp, rect, color=(255, 255, 255))
+        label_temp[np.where(label_temp == 255)] = label_val
+        print('le minimax de label temp', np.min(label_temp), np.max(label_temp))
+        label = label + label_temp
+        print('Label', np.min(label), np.max(label))
+    print(np.min(label), np.max(label))
     label = resize(label, shape)
+    print('Le label final')
+    plt.imshow(label)
+    plt.show()
     # label_test = (label - np.min(label))/(np.max(label)-np.min(label))
     # label_test = resize(label_test, (224, 224, 3))
     # plt.imshow(label_test)
