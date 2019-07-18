@@ -15,8 +15,6 @@ class ExperienceReplay:
     def store(self, data, demo = False):
         if len(self.header) != len(data):
             raise ValueError("wrong number of stored data {} expected vs {}".format(len(self.header), len(data)))
-
-
         self.replay_buffer.append(data)
 
     def generate_ranking(self):
@@ -60,8 +58,8 @@ class ExperienceReplay:
                 # print(type(batch_img))
                 # print(batch_img.shape)
                 return batch_img, batch_lab
-
             return None, None
+
             ### Useless ###
             # print("Nb data for experience replay : {}".format(data.shape))
             # for idx, row in data.iterrows():

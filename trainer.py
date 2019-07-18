@@ -45,10 +45,11 @@ class Trainer(object):
         self.create_log()
         checkpoint_directory = "checkpoint_1"
 
+        self.checkpoint = tf.train.Checkpoint(optimizer=self.optimizer, model=self.myModel,
+                                              optimizer_step=tf.train.get_or_create_global_step())
+
         if savetosnapshot:
             self.snapshot_file = os.path.join(checkpoint_directory, snapshot_file)
-            self.checkpoint = tf.train.Checkpoint(optimizer=self.optimizer, model=self.myModel,
-                                                  optimizer_step=tf.train.get_or_create_global_step())
             self.checkpoint.save(self.snapshot_file)
             print('Creating snapshot : {}'.format(self.snapshot_file))
 
@@ -57,13 +58,10 @@ class Trainer(object):
             status = self.checkpoint.restore(latest_snapshot_file)
             print('Pre-trained model snapshot loaded from: {}'.format(latest_snapshot_file))
         # else:
-
-
         self.loss = tf.losses.huber_loss
-        flat_logits = tf.reshape(tensor=upsampled_logits, shape=(-1, number_of_classes))
+        # self.loss = tf.losses.mean_squared_error
+        # self.loss = tf.losses.softmax_cross_entropy
 
-        cross_entropies = tf.nn.softmax_cross_entropy_with_logits(logits=flat_logits,
-                                                                  labels=flat_labels)
         ######                     Demonstration                            ######
         self.best_idx = [125, 103]
 
@@ -87,38 +85,42 @@ class Trainer(object):
 
     def compute_loss_dem(self, label, noBackprop=False):
         # expected_reward, action_reward = self.action.compute_reward(self.action.grasp, self.future_reward)
-        # plt.subplot(1, 4, 4)
-        # plt.imshow(label.numpy()[0, :, :, 0])
         label = self.reduced_label(label)
-
-        new_lab, label_numpy = self.output_prob.numpy(), label.numpy()
-        weight = np.zeros(label_numpy.shape)
-        weight[label_numpy != 0] = 1
-        weight[label_numpy == 0] = 0
-
-        new_lab *= 0.8
-        new_lab[label_numpy == 1] = 1
-        new_lab[label_numpy == -1] = 0
-
+        new_lab = label.numpy()
+        ######## Partie avec Tanh ########
         out_num = self.output_prob.numpy()[0, :, :, 0]
-        x_max, y_max = np.argmax(np.max(out_num, axis=1)), np.argmax(np.max(out_num, axis=0))
-        x_target, y_target = np.argmax(np.max(label_numpy, axis=1)), np.argmax(np.max(label_numpy, axis=0))
-        # new_lab[label_numpy != 1] /= 2
-        # plt.subplot(1, 4, 3)
-        # plt.imshow(new_lab[0, :, :, 0])
-        # plt.show()
-        label = tf.convert_to_tensor(new_lab)
-        # print(new_lab[0,:,:,:].shape, self.output_prob[0,:,:,:].shape)
-
-        # plt.subplot(1, 2, 1)
-        # plt.imshow(new_lab[0, :, :, 0], vmin=0, vmax=1)
-        # plt.subplot(1, 2, 2)
-        # plt.imshow(self.output_prob[0, :, :, 0], vmin=0, vmax=1)
-        # plt.show()
         # self.loss_value = self.loss(label, self.output_prob, reduction=tf.losses.Reduction.SUM)
+        self.loss_value = self.loss(label, self.output_prob)
 
-        self.loss_value = self.loss(label, self.output_prob, weight) # + (x_max-x_target)**2 + (y_max-y_target)**2
-        print('La valeur de perte : {}'.format(self.loss_value.numpy()))
+        ######## Partie avec Huber Loss  ############"
+        # weight = np.zeros(label_numpy.shape)
+        # weight[label_numpy > 0] = 1
+        # weight[label_numpy < 0] = 3
+        # weight[label_numpy == 0] = 0
+        #
+        # new_lab *= 0.8
+        # new_lab[label_numpy == 1] = 1
+        # new_lab[label_numpy == -1] = 0
+        #
+        # out_num = self.output_prob.numpy()[0, :, :, 0]
+        # x_max, y_max = np.argmax(np.max(out_num, axis=1)), np.argmax(np.max(out_num, axis=0))
+        # x_target, y_target = np.argmax(np.max(label_numpy, axis=1)), np.argmax(np.max(label_numpy, axis=0))
+        #
+        # # plt.subplot(1, 4, 3)
+        # # plt.imshow(new_lab[0, :, :, 0])
+        # # plt.show()
+        # label = tf.convert_to_tensor(new_lab)
+        # # print(new_lab[0, :, :, :].shape, self.output_prob[0,:,:,:].shape)
+        #
+        # # plt.subplot(1, 2, 1)
+        # # plt.imshow(new_lab[0, :, :, 0], vmin=0, vmax=1)
+        # # plt.subplot(1, 2, 2)
+        # # plt.imshow(self.output_prob[0, :, :, 0], vmin=0, vmax=1)
+        # # plt.show()
+        # # self.loss_value = self.loss(label, self.output_prob, reduction=tf.losses.Reduction.SUM)
+        # self.loss_value = self.loss(label, self.output_prob)
+        #### Fin de la partie avec Huber Loss ####
+
         # print('La valeur de perte est {}'.format(self.loss_value.numpy()))
         # Tensorboard ouputs
 
@@ -200,12 +202,10 @@ class Trainer(object):
             tape.watch(self.myModel.trainable_variables)
             self.forward(im)
             self.compute_loss_dem(label)
-
             grad = tape.gradient(self.loss_value, self.myModel.trainable_variables)
             self.optimizer.apply_gradients(zip(grad, self.myModel.trainable_variables),
                                            global_step=tf.train.get_or_create_global_step())
             self.iteration = tf.train.get_global_step()
-
         self.exp_rpl.store([im, label, self.loss_value])
 
     def main_without_backprop(self, im, best_pix, batch_size=1, augmentation_factor=4, demo=True):
@@ -234,8 +234,11 @@ class Trainer(object):
         for epoch in range(nb_epoch):
             for batch in range(200):
                 if batch % 20 == 0:
+                    print('La valeur de perte : {}'.format(self.loss_value.numpy()))
                     print('Epoch {}/{}, Batch {}/{}'.format(epoch + 1, nb_epoch, batch + 1, 200))
                 batch_im, batch_lab = self.exp_rpl.replay(batch_size=batch_size)
+                # plt.imshow(batch_im[0, :, :, 0])
+                # plt.show()
                 self.main_batches(batch_im, batch_lab)
 
     def random_batch(self, batch_size, dataset):
@@ -263,8 +266,9 @@ class Trainer(object):
         dataset = da.OnlineAugmentation().generate_batch(im, label, np.min(im), viz=False, augmentation_factor=augmentation_factor)
         for epoch in range(epoch_size):
             for batch in range(len(dataset['im']) // batch_size):
-                print('Epoch {}/{}, Batch {}/{}'.format(epoch + 1, epoch_size, batch + 1,
-                                                        len(dataset['im']) // batch_size))
+                if batch % 50 == 0:
+                    print('Epoch {}/{}, Batch {}/{}'.format(epoch + 1, epoch_size, batch + 1,
+                                                            len(dataset['im']) // batch_size))
                 batch_im, batch_lab = self.random_batch(batch_size, dataset)
                 # plt.subplot(1,2,1)
                 # plt.imshow(batch_lab.numpy()[0,:,:,0])
@@ -288,17 +292,24 @@ class Trainer(object):
         self.checkpoint.save(self.snapshot_file)
 
     def prediction_viz(self, qmap, im):
-        qmap = qmap[0, :, :, :]
+        # Version Tanh
+        qmap = (qmap[0, :, :, :] + 1) / 2
         qmap = tf.image.resize_images(qmap, (self.width, self.height))
         qmap = tf.image.resize_images(qmap, (224, 224), method=tf.image.ResizeMethod.NEAREST_NEIGHBOR)
         qmap = tf.reshape(qmap, (224, 224))
+        # Version Huber Loss
+        # qmap = qmap[0, :, :, :]
+        # qmap = tf.image.resize_images(qmap, (self.width, self.height))
+        # qmap = tf.image.resize_images(qmap, (224, 224), method=tf.image.ResizeMethod.NEAREST_NEIGHBOR)
+        # qmap = tf.reshape(qmap, (224, 224))
+
         x_map, y_map = np.argmax(np.max(qmap, axis=1)), np.argmax(np.max(qmap, axis=0))
         rescale_qmap = qmap
         img = np.zeros((224, 224, 3))
-        img[:, :, 0] = im[0, :, :, 0]/np.max(im[0, :, :, 0])
+        img[:, :, 0] = im[0, :, :, 0] / np.max(im[0,:,:,0])
         img[:, :, 1] = rescale_qmap
         img[x_map-5:x_map+5, y_map-5:y_map+5, 2] = 1
-        img = img / np.max(img)
+        img = img   # To resize between 0 and 1 : to display with output probability
         # plt.imshow(img)
         # plt.show()
         return img
@@ -367,13 +378,13 @@ class Trainer(object):
                 pass
 
 if __name__=='__main__':
-    Network = Trainer(savetosnapshot=False, load=True, snapshot_file='reference')
+    Network = Trainer(savetosnapshot=False, load=False, snapshot_file='reference')
     im = np.zeros((1, 224, 224, 3), np.float32)
     im[:, 70:190, 100:105, :] = 1
     im[:, 70:80, 80:125, :] = 1
 
     best_pix = [103, 125, 0, 40, 10]
-    best_pix = [83, 76, 0, 30, 10]         # x, y, angle, e, lp
+    # best_pix = [83, 76, 0, 30, 10]         # x, y, angle, e, lp
 
     out = Network.forward(im)
     viz = Network.prediction_viz(out, im)
@@ -394,7 +405,6 @@ if __name__=='__main__':
         plt.show()
 
     Network.main(best_pix, im)
-    #
     im = np.zeros((1, 224, 224, 3), np.float32)
     im[:, 70:190, 100:105, :] = 1
     im[:, 70:80, 80:125, :] = 1

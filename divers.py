@@ -7,17 +7,19 @@ import cv2
 
 def heatmap2pointcloud(img):
     # Rescale between 0 and 1
-    plt.imshow(img)
+
     print('Ce qui rentre ')
-    plt.show()
-    img = (img - np.min(img))/(np.max(img)-np.min(img))
+    # img = (img - np.min(img))/(np.max(img)-np.min(img))
     PointCloudList = []
-    img[img<0] = 0.
-    plt.imshow(img)
-    plt.show()
     for index, x in np.ndenumerate(img):
-        for i in range(int(x*10)):
-            PointCloudList.append([index[1], 100-index[0]])
+        for i in range(int(x*100)):
+            PointCloudList.append([index[1], img.shape[0]-index[0]])
+    PointCloudList = np.array(PointCloudList)
+    # plt.subplot(1, 2, 1)
+    # plt.imshow(img)
+    # plt.subplot(1, 2, 2)
+    # plt.scatter(PointCloudList[:, 0], PointCloudList[:, 1])
+    # plt.show()
     return np.asarray(PointCloudList)
 
 def py_ang(v1, v2):
@@ -48,19 +50,10 @@ def preprocess_depth_img(depth_image):
     depth_image[depth_image < 0.35] = 0
     # depth_image[depth_image == 0] = np.mean(depth_image[depth_image != 0])  Commenté le 16 juillet
     depth_image[depth_image == 0] = np.max(depth_image[depth_image != 0])
-    print('C est par la', np.max(depth_image), np.min(depth_image), np.mean(depth_image))
     min = second_min(depth_image.flatten())
     mini = np.min(depth_image.flatten())
-    print('Le deuxième minimum est ', min)
-    plt.subplot(1, 3, 1)
-    plt.imshow(depth_image)
     depth_image = np.ones(depth_image.shape) - (depth_image - mini) / (depth_image.max() - mini)
-    plt.subplot(1, 3, 2)
-    plt.imshow(depth_image)
     # depth_image[depth_image > 1] = 0
-    plt.subplot(1, 3, 3)
-    plt.imshow(depth_image)
-    plt.show()
     depth_image = (depth_image * 255).astype('uint8')
     depth_image = np.asarray(np.dstack((depth_image, depth_image, depth_image)), dtype=np.uint8)
     return depth_image
@@ -95,9 +88,10 @@ def postprocess_img( imgs, list_angles):
 
 def postprocess_pred(out, camera):
     out[out < 0] = 0
-    zoom_pixel = 100
+    zoom_pixel = 50
 
     (y_max, x_max) = np.unravel_index(out[:, :, 1].argmax(), out[:, :, 1].shape)
+    y_max, x_max = y_max+10, x_max+10
     ####### REMARQUE quand le max pixel est a moins de 50 des bords, ca buggue ######
     test_pca = out[max(y_max-zoom_pixel, 0):min(y_max+zoom_pixel, out.shape[0]), max(x_max-zoom_pixel, 0):min(x_max+zoom_pixel, out.shape[1]), 1]
     PointCloud = heatmap2pointcloud(test_pca)
@@ -105,6 +99,7 @@ def postprocess_pred(out, camera):
     pca.fit(PointCloud)
     vectors = pca.components_
     sing_val = pca.singular_values_/np.linalg.norm(pca.singular_values_)
+    print(vectors, sing_val)
     vectors[0] *= sing_val[0]
     vectors[1] *= sing_val[1]
     np.linalg.norm(pca.singular_values_)
@@ -112,7 +107,7 @@ def postprocess_pred(out, camera):
     e = 30
     theta = py_ang([1, 0], vectors[0])*180/np.pi
     # e_mm = get_ecartement_pince(sing_val[1], theta, (y_max, x_max), camera)
-    return x_max, y_max, theta, e
+    return x_max, y_max, theta, e, test_pca
 
 
 def get_ecartement_pince(vp, theta, center, camera):
@@ -193,14 +188,12 @@ def compute_labels(best_pix_ind, shape=(224,224,3), viz=False):
     for i in range(len(best_pix_ind)):
         label_temp = np.zeros(shape, dtype=np.float32)
         x, y, angle, e, lp, label_val = best_pix_ind[i]
-        print(best_pix_ind[i])
         rect = draw_rectangle(e, angle, x, y, lp)
         cv2.fillConvexPoly(label_temp, rect, color=(255, 255, 255))
         label_temp[np.where(label_temp == 255)] = label_val
         print('le minimax de label temp', np.min(label_temp), np.max(label_temp))
         label = label + label_temp
         print('Label', np.min(label), np.max(label))
-    print(np.min(label), np.max(label))
     label = resize(label, shape)
     print('Le label final')
     plt.imshow(label)

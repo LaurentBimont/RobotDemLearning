@@ -69,34 +69,165 @@ class PixelNet(BaseDeepModel):
         x = tf.reshape(x, (1, 21, 21, 1))
         return x
 
+class OnlyConvNet(BaseDeepModel):
+    def __init__(self):
+        super(OnlyConvNet, self).__init__()
+        # Batch Normalization speed up convergence by reducing the internal covariance shift between batches
+        # We can use a higher learning rate and it acts like a regulizer
+        # https://arxiv.org/abs/1502.03167
+        self.conv0 = tf.keras.layers.Convolution2D(32, kernel_size=(9, 9), strides=3, activation=tf.nn.relu,
+                                                   use_bias=True, padding='same', name="grasp-conv0",
+                                                   trainable=True)
+        self.conv1 = tf.keras.layers.Convolution2D(16, kernel_size=(5, 5), strides=2, activation=tf.nn.relu,
+                                                   use_bias=True, padding='same', name="grasp-conv1",
+                                                   trainable=True)
+        self.conv2 = tf.keras.layers.Convolution2D(8, kernel_size=(3, 3), strides=2, activation=tf.nn.relu,
+                                                   use_bias=True, padding='same', name="grasp-conv2",
+                                                   trainable=True)
+        self.tconv0 = tf.keras.layers.Conv2DTranspose(8, kernel_size=(3, 3), strides=2, activation=tf.nn.relu,
+                                                      use_bias=True, padding='same', name="tgrasp_conv0",
+                                                      trainable=True)
+        self.tconv1 = tf.keras.layers.Conv2DTranspose(16, kernel_size=(5, 5), strides=2, activation=tf.nn.relu,
+                                                      use_bias=True, padding='same', name="tgrasp_conv0",
+                                                      trainable=True)
+        self.tconv2 = tf.keras.layers.Conv2DTranspose(32, kernel_size=(9, 9), strides=3, activation=tf.nn.relu,
+                                                      use_bias=True, padding='same', name="tgrasp_conv0",
+                                                      trainable=True)
+        self.outputconv = tf.keras.layers.Convolution2D(1, kernel_size=(2, 2), strides=2, activation=tf.nn.sigmoid,
+                                                   use_bias=True, padding='same', name="grasp-conv2",
+                                                   trainable=True)
+
+    def call(self, inputs, bufferize=False, step_id=-1):
+        x = self.conv0(inputs)
+        x = self.conv1(x)
+        x = self.conv2(x)
+        x = self.tconv0(x)
+        x = self.tconv1(x)
+        x = self.tconv2(x)
+        x = self.outputconv(x)
+        return(x)
+
+class PrincetonNet(BaseDeepModel):
+    def __init__(self):
+        super(OnlyConvNet, self).__init__()
+        # Batch Normalization speed up convergence by reducing the internal covariance shift between batches
+        # We can use a higher learning rate and it acts like a regulizer
+        # https://arxiv.org/abs/1502.03167
+        self.bn0 = tf.keras.layers.BatchNormalization(name="grasp-b0")
+
+        self.conv0 = tf.keras.layers.Convolution2D(32, kernel_size=(9, 9), strides=3, activation=tf.nn.relu,
+                                                   use_bias=True, padding='same', name="grasp-conv0",
+                                                   trainable=True)
+        self.conv1 = tf.keras.layers.Convolution2D(16, kernel_size=(5, 5), strides=2, activation=tf.nn.relu,
+                                                   use_bias=True, padding='same', name="grasp-conv1",
+                                                   trainable=True)
+        self.conv2 = tf.keras.layers.Convolution2D(8, kernel_size=(3, 3), strides=2, activation=tf.nn.relu,
+                                                   use_bias=True, padding='same', name="grasp-conv2",
+                                                   trainable=True)
+
+
+    def call(self, inputs, bufferize=False, step_id=-1):
+        x = self.conv0(inputs)
+        x = self.conv1(x)
+        x = self.conv2(x)
+        x = self.tconv0(x)
+        x = self.tconv1(x)
+        x = self.tconv2(x)
+        x = self.outputconv(x)
+        return(x)
+
+class GraspNetTest(BaseDeepModel):
+    def __init__(self):
+        super(GraspNetTest, self).__init__()
+        # Batch Normalization speed up convergence by reducing the internal covariance shift between batches
+        # We can use a higher learning rate and it acts like a regulizer
+        # https://arxiv.org/abs/1502.03167
+
+        self.bn0 = tf.keras.layers.BatchNormalization(name="grasp-b0")
+        self.conv0 = tf.keras.layers.Convolution2D(128, kernel_size=5, strides=1, activation=tf.nn.relu,
+                                                   use_bias=True, padding='same', name="grasp-conv0", trainable=True)
+        self.bn1 = tf.keras.layers.BatchNormalization(name="grasp-b1")
+
+        self.drop1 = tf.keras.layers.Dropout(0.2)
+        self.conv1 = tf.keras.layers.Convolution2D(256, kernel_size=5, strides=1, activation=tf.nn.relu,
+                                                   use_bias=True, padding='same', name="grasp-conv1", trainable=True)
+        self.bn2 = tf.keras.layers.BatchNormalization(name="grasp-b2")
+
+        self.drop2 = tf.keras.layers.Dropout(0.2)
+        self.conv2 = tf.keras.layers.Convolution2D(1, kernel_size=1, strides=1, activation=tf.nn.tanh,
+                                                   use_bias=False, padding='same', name="grasp-conv2", trainable=True)
+        self.bn3 = tf.keras.layers.BatchNormalization(name="grasp-b2")
+
+        # self.tconv0 = tf.keras.layers.Conv2DTranspose(32, kernel_size=(2, 2), strides=3, activation=tf.nn.relu,
+        #                                               use_bias=True, padding='same', name="tgrasp_conv0",
+        #                                               trainable=True)
+
+    def call(self, inputs, bufferize=False, step_id=-1):
+        # print('Entrée du réseau seondaire', inputs.shape)
+        x = self.bn0(inputs)
+        x = self.conv0(inputs)
+        x = self.bn1(x)
+        x = self.drop1(x)
+        x = self.conv1(x)
+        x = self.bn2(x)
+        x = self.drop2(x)
+        # x = self.tconv0(x)
+        x = self.conv2(x)
+        # x = self.bn3(x)
+        # x = tf.multiply(3, x)
+        # Rescaling between 0 and 1
+        # x = tf.div(tf.subtract(x, tf.reduce_min(x)), tf.subtract(tf.reduce_max(x), tf.reduce_min(x)))
+        # x = tf.sigmoid(self.bn2(x))
+        # x = self.conv3(x)
+        # x = tf.math.add(tf.math.add(x[:, :, :, 0], x[:, :, :, 1]), x[:, :, :, 2])
+        # x = x[:, :, :, 0]
+        # x = tf.math.divide(x, tf.constant(3, dtype=tf.float32))
+        # x = tf.reshape(x, (*x.shape, 1))
+        # for i in range(x.shape[0]):
+        #     x[i, :, :, :] = tf.div(tf.subtract(x[i, :, :, :], tf.reduce_min(x[i, :, :, :])),
+        #                            tf.subtract(tf.reduce_max(x[i, :, :, :]), tf.reduce_min(x[i, :, :, :])))
+        # x = tf.div(tf.subtract(x, tf.reduce_min(x)), tf.subtract(tf.reduce_max(x), tf.reduce_min(x)))
+        return x
+
+
 class GraspNet(BaseDeepModel):
     def __init__(self):
         super(GraspNet, self).__init__()
         # Batch Normalization speed up convergence by reducing the internal covariance shift between batches
         # We can use a higher learning rate and it acts like a regulizer
         # https://arxiv.org/abs/1502.03167
+
         self.bn0 = tf.keras.layers.BatchNormalization(name="grasp-b0")
         self.conv0 = tf.keras.layers.Convolution2D(128, kernel_size=1, strides=1, activation=tf.nn.relu,
-                                                    use_bias=True, padding='valid', name="grasp-conv0", trainable=True)
+                                                   use_bias=True, padding='same', name="grasp-conv0", trainable=True)
         self.bn1 = tf.keras.layers.BatchNormalization(name="grasp-b1")
 
+        self.drop1 = tf.keras.layers.Dropout(0.2)
         self.conv1 = tf.keras.layers.Convolution2D(256, kernel_size=1, strides=1, activation=tf.nn.relu,
-                                                   use_bias=True, padding='valid', name="grasp-conv0", trainable=True)
+                                                   use_bias=True, padding='same', name="grasp-conv1", trainable=True)
         self.bn2 = tf.keras.layers.BatchNormalization(name="grasp-b2")
 
+        self.drop2 = tf.keras.layers.Dropout(0.2)
         self.conv2 = tf.keras.layers.Convolution2D(1, kernel_size=1, strides=1, activation=tf.nn.sigmoid,
-                                                    use_bias=False, padding='valid', name="grasp-conv1", trainable=True)
+                                                   use_bias=False, padding='same', name="grasp-conv2", trainable=True)
         self.bn3 = tf.keras.layers.BatchNormalization(name="grasp-b2")
+
+        # self.tconv0 = tf.keras.layers.Conv2DTranspose(32, kernel_size=(2, 2), strides=3, activation=tf.nn.relu,
+        #                                               use_bias=True, padding='same', name="tgrasp_conv0",
+        #                                               trainable=True)
 
     def call(self, inputs, bufferize=False, step_id=-1):
         # print('Entrée du réseau seondaire', inputs.shape)
         #x = self.bn0(inputs)
         x = self.conv0(inputs)
         x = self.bn1(x)
+        x = self.drop1(x)
         x = self.conv1(x)
         x = self.bn2(x)
+        x = self.drop2(x)
+        # x = self.tconv0(x)
         x = self.conv2(x)
-        x = self.bn3(x)
+        # x = self.bn3(x)
         # x = tf.multiply(3, x)
         # Rescaling between 0 and 1
         # x = tf.div(tf.subtract(x, tf.reduce_min(x)), tf.subtract(tf.reduce_max(x), tf.reduce_min(x)))
@@ -118,9 +249,10 @@ class Reinforcement(tf.keras.Model):
         self.Dense = DensenetFeatModel()
         # self.VGG = VGGFeatModel()
         self.QGrasp = GraspNet()
+        self.QGraspTest = GraspNetTest()
         self.PixNet = PixelNet()
-        self.my_trainable_variables = self.QGrasp.trainable_variables
-        print("Number of Trainable Variables", self.QGrasp.trainable_variables)
+        self.OnlyConvNet = OnlyConvNet()
+        # self.my_trainable_variables = self.QGrasp.trainable_variables
 
         # Initialize variables
         self.in_height, self.in_width = 0, 0
@@ -132,13 +264,14 @@ class Reinforcement(tf.keras.Model):
     def call(self, input):
         # x = self.QGrasp(self.VGG(input))
         # x = self.QGrasp(input)
-        x = self.QGrasp(self.Dense(input))
+        # x = self.QGrasp(self.Dense(input))
         # x = self.PixNet(self.Dense(input))
         # x = self.QGrasp(input)
+        # x = self.OnlyConvNet(input)
+        x = self.QGraspTest(self.Dense(input))
         return x
 
 if __name__ == "__main__":
-    
     im = np.ndarray((3, 224, 224, 3), np.float32)
     Densenet = Reinforcement()
     print(Densenet(im))

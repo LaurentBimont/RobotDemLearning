@@ -146,7 +146,7 @@ class OnlineAugmentation(object):
         print('taille image diametre ', im.shape)
         print('Facteur da ', augmentation_factor)
         for i in range(augmentation_factor):
-            ima, lab = self.crop(im, label, zooming=np.random.randint(100, 200))
+            ima, lab = self.crop(im, label, zooming=np.random.randint(150, 223))
             if self.assert_label(lab):
                 for j in range(augmentation_factor):
                     ima, lab = self.translate(ima, lab, mini,
@@ -187,7 +187,6 @@ if __name__=="__main__":
     print(0)
     hey.forward(im)
 
-    print(1)
     label= hey.compute_labels(1.9, best_idx)
     print(2)
     OA = OnlineAugmentation()

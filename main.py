@@ -9,13 +9,13 @@ import traceback
 from os import listdir
 from os.path import isfile, join
 
-
 ## Import des différentes classes
 import divers as div
 from trainer import Trainer
 from robot import Robot
 from fingertracking import FingerTracker
 from camera import RealCamera
+
 #########Fonction pour la lisbilité #########
 def get_pred(camera, trainer):
     depth_image, _ = camera.get_frame()
@@ -24,15 +24,22 @@ def get_pred(camera, trainer):
     init_shape = depth_image.shape
     depth_image = div.preprocess_depth_img(depth_image)
     depth_image = resize(depth_image, (224, 224, 3), anti_aliasing=True)
-    depth_image = depth_image.reshape((1, 224, 224, 3))
-    output_prob = trainer.forward(depth_image)
+    depth_image = (depth_image * 255).astype('uint8')
 
-    out = trainer.prediction_viz(output_prob, depth_image)
+    depth_image = depth_image.reshape((1, 224, 224, 3))
+
+    copy_depth = depth_image.copy()
+    output_prob = trainer.forward(depth_image)
+    out_numpy = output_prob.numpy()
+
+
+    out = trainer.prediction_viz(out_numpy, depth_image)
+
     out = out.reshape((224, 224, 3))
     out = resize(out, init_shape)
-    print(np.max(output_prob))
+
     viz = True
-    x_pred, y_pred, angle_pred, e_pred = div.postprocess_pred(out, camera)
+    x_pred, y_pred, angle_pred, e_pred, pca_zoom = div.postprocess_pred(out, camera)
 
     if viz:
         rect = div.draw_rectangle(e_pred, angle_pred, x_pred, y_pred, 20)
@@ -42,14 +49,14 @@ def get_pred(camera, trainer):
         plt.plot([rect[0][0], rect[1][0]], [rect[0][1], rect[1][1]], linewidth=2, color='yellow')
         plt.plot([rect[2][0], rect[3][0]], [rect[2][1], rect[3][1]], linewidth=2, color='yellow')
         plt.subplot(2, 2, 2)
-        plt.imshow(cv2.cvtColor(_, cv2.COLOR_BGR2RGB))
+        plt.imshow(pca_zoom)
+        #plt.imshow(cv2.cvtColor(_, cv2.COLOR_BGR2RGB))
         # plt.savefig('pred{}.png'.format(i), dpi=600)
         # if execute=='1':
         plt.subplot(2, 2, 3)
-        plt.imshow(depth)
-        plt.scatter(int(x_pred), int(y_pred))
-        plt.subplot(2, 2, 4)
-        print(out.shape)
+        plt.imshow(copy_depth[0, :, :, :])
+        # plt.scatter(int(x_pred), int(y_pred))
+        plt.subplot(2, 2, 3)
         plt.imshow(out[:, :, 1])
         plt.show()
     return x_pred, y_pred, angle_pred, e_pred, depth
@@ -76,7 +83,6 @@ def demo(nb_demo):
     depth_image = div.preprocess_depth_img(depth_image)
     label_plt = div.compute_labels(xp_param, shape=depth_image.shape)
     print('Voici ce qui sera enregistré')
-    print(xp_param)
     plt.subplot(1, 2, 1)
     plt.imshow(label_plt[:, :, 0])
     plt.subplot(1, 2, 2)
@@ -110,6 +116,7 @@ def learning(demo_depth_label, explo_depth_label, trainer):
     return trainer
 
 def viz_grap(trainer):
+
     x_pred, y_pred, angle_pred, e_pred, depth = get_pred(camera, trainer)
 
 def grasping(nb_trial):
@@ -167,16 +174,18 @@ def test(trainer, isdemo, isgrasp, istrain, isreload, ):
         trainer = learning(demo_depth_label, explo_depth_label, trainer)
     if isgrasp:
         cont = '1'
+        nb_attempt = 0
         while cont=='1':
             viz_grap(trainer)
+            # grasping(nb_attempt)
+            nb_attempt += 1
             cont = input('Voulez vous continuer ? ')
         # grasping(nb_trial)
-
 
 def validation(camera):
     nb_demo = 0 
     nb_trial = 0 
-    
+
     while True: 
         try:
             ref_point = FT.detect_blue(camera)[0]
@@ -210,14 +219,14 @@ def validation(camera):
 
 if __name__=="__main__":
     ######### Initialisation des différents outils #########
-    #iiwa = Robot()
+    # iiwa = Robot()
     camera = RealCamera()
     FT = FingerTracker()
     time.sleep(1)
     ######### Mise en Position #########
-    #iiwa.home()
+    # iiwa.home()
 
-    trainer = Trainer(savetosnapshot=True, load=False, snapshot_file='16juillet')
+    trainer = Trainer(savetosnapshot=True, load=False, snapshot_file='ampouletanh')
 
     ####### Clean Zone #######
     camera.start_pipe()
@@ -253,9 +262,9 @@ if __name__=="__main__":
         exc_info = sys.exc_info()
         traceback.print_exception(*exc_info)
 
-        #iiwa.iiwa.close()
+        # iiwa.iiwa.close()
         camera.stop_pipe()
 
     finally: 
-        #iiwa.iiwa.close()
+        # iiwa.iiwa.close()
         camera.stop_pipe()
