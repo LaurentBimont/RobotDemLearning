@@ -79,18 +79,22 @@ class Trainer(object):
         input = div.preprocess_img(input, target_height=self.scale_factor*224, target_width=self.scale_factor*224)
         # Pass input data through model
         self.output_prob = self.myModel(input)
-        self.batch, self.width, self.height = self.output_prob.shape[0], self.output_prob.shape[1], self.output_prob.shape[2]
+        self.batch, self.width, self.height = self.output_prob[0].shape[0], self.output_prob[0].shape[1], self.output_prob[0].shape[2]
         # Return Q-map
         return self.output_prob
 
     def compute_loss_dem(self, label, noBackprop=False):
         # expected_reward, action_reward = self.action.compute_reward(self.action.grasp, self.future_reward)
-        label = self.reduced_label(label)
-        new_lab = label.numpy()
+        self.loss_value = 0
+        for l, output in zip(label, self.output_prob):
+            l = self.reduced_label(l)
+            
+            self.loss_value += self.loss(l, output)
+
         ######## Partie avec Tanh ########
-        out_num = self.output_prob.numpy()[0, :, :, 0]
-        # self.loss_value = self.loss(label, self.output_prob, reduction=tf.losses.Reduction.SUM)
-        self.loss_value = self.loss(label, self.output_prob)
+
+        new_lab = label[0].numpy()
+
 
         ######## Partie avec Huber Loss  ############"
         # weight = np.zeros(label_numpy.shape)
@@ -224,7 +228,7 @@ class Trainer(object):
         for batch in range(len(self.dataset['im'])//batch_size):
             batch_im, batch_label = self.random_batch(batch_size, self.dataset)
             self.forward(batch_im)
-            self.compute_loss_dem(batch_label, noBackprop=True)
+            self.compute_loss_dem([batch_label,batch_label,batch_label, batch_label], noBackprop=True)
             self.exp_rpl.store([batch_im, batch_label, self.loss_value], demo)
             if batch % 20 == 0:
                 print('{}/{}'.format(batch, len(self.dataset['im'])//batch_size))
