@@ -85,7 +85,7 @@ def postprocess_img( imgs, list_angles):
     resized_imgs = tf.image.resize_images(rimgs, (320, 320))
     return resized_imgs
 
-def postprocess_pred(out, camera):
+def postprocess_pred(out):
     out[out < 0] = 0
     zoom_pixel = 50
 

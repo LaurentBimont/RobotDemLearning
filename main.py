@@ -17,7 +17,8 @@ from fingertracking import FingerTracker
 from camera import RealCamera
 
 #########Fonction pour la lisbilité #########
-def get_pred(camera, trainer):
+
+def get_pred(trainer):
     depth_image, _ = camera.get_frame()
     depth = np.copy(depth_image)
 
@@ -30,15 +31,15 @@ def get_pred(camera, trainer):
 
     copy_depth = depth_image.copy()
     output_prob = trainer.forward(depth_image)
-    out_numpy = output_prob.numpy()
-
+    out_numpy = output_prob[0].numpy()
+    
     out = trainer.prediction_viz(out_numpy, depth_image)
 
     out = out.reshape((224, 224, 3))
     out = resize(out, init_shape)
 
     viz = True
-    x_pred, y_pred, angle_pred, e_pred, pca_zoom = div.postprocess_pred(out, camera)
+    x_pred, y_pred, angle_pred, e_pred, pca_zoom = div.postprocess_pred(out)
 
     if viz:
         rect = div.draw_rectangle(e_pred, angle_pred, x_pred, y_pred, 20)
@@ -104,21 +105,21 @@ def learning(demo_depth_label, explo_depth_label, trainer):
         for depth, label in demo_depth_label:
             trainer.main_without_backprop(depth,
                                             label,
-                                            augmentation_factor=5,
+                                            augmentation_factor=2,
                                             demo=True)
         for depth, label in explo_depth_label:
             trainer.main_without_backprop(depth,
                                             label,
-                                            augmentation_factor=3,
+                                            augmentation_factor=2,
                                             demo=False)
             print('starting main training')
         ### Train with experienceReplay replay
-    trainer.main_xpreplay(nb_epoch=4, batch_size=1)
+    trainer.main_xpreplay(nb_epoch=1 , batch_size=1)
     return trainer
 
 def viz_grap(trainer):
 
-    x_pred, y_pred, angle_pred, e_pred, depth = get_pred(camera, trainer)
+    x_pred, y_pred, angle_pred, e_pred, depth = get_pred(trainer)
 
 def grasping(nb_trial):
     x_pred, y_pred, angle_pred, e_pred, depth = get_pred(camera, trainer)
@@ -221,18 +222,12 @@ def validation(camera):
 if __name__=="__main__":
     ######### Initialisation des différents outils #########
     # iiwa = Robot()
-    camera = RealCamera()
-    FT = FingerTracker()
-    time.sleep(1)
     ######### Mise en Position #########
     # iiwa.home()
 
     trainer = Trainer(savetosnapshot=False, load=False, snapshot_file='ampouletanh')
 
     ####### Clean Zone #######
-    camera.start_pipe()
-    time.sleep(1)
-    camera_param = [camera.intr.fx, camera.intr.fy, camera.intr.ppx, camera.intr.ppy, camera.depth_scale]
 
     ### Paramètre à toucher ###
     load_needed = False
@@ -264,8 +259,4 @@ if __name__=="__main__":
         traceback.print_exception(*exc_info)
 
         # iiwa.iiwa.close()
-        camera.stop_pipe()
 
-    finally: 
-        # iiwa.iiwa.close()
-        camera.stop_pipe()
