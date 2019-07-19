@@ -1,6 +1,7 @@
 import tensorflow as tf
 import numpy as np
 import matplotlib.pyplot as plt
+import divers as div
 
 
 if __name__=="__main__":
@@ -34,7 +35,6 @@ class OnlineAugmentation(object):
         if type(im).__module__ == np.__name__:
             # If it is a numpy array
             im = np.reshape(im, (224, 224, 3))
-        print(label.shape, im.shape)
         my_batch = [im, label]
         self.batch = tf.stack(my_batch)
 
@@ -55,14 +55,32 @@ class OnlineAugmentation(object):
                  of the Network
         '''
         self.create_batch(im, label)
+        # First Flip
         flip = tf.image.flip_up_down(self.batch)
-        self.add_im(flip)
-        flip = tf.image.flip_left_right(flip)
-        self.add_im(flip)
-        flip = tf.image.flip_left_right(self.batch)
+        flip_nump = flip.numpy()
+        flip_nump_angle = -1*flip_nump[1, :, :, 1]
+        flip_nump[1, :, :, 1] = flip_nump_angle
+        flip = tf.convert_to_tensor(flip_nump)
         self.add_im(flip)
 
-        # To be deleted
+        flip = tf.image.flip_left_right(flip)
+        flip_nump = flip.numpy()
+        flip_nump_angle = flip_nump[1, :, :, 1]
+        flip_nump_angle = 180 * (flip_nump_angle != 0).astype(np.int) - 1 * flip_nump_angle
+        flip_nump[1, :, :, 1] = flip_nump_angle
+        flip = tf.convert_to_tensor(flip_nump)
+
+        self.add_im(flip)
+
+        flip = tf.image.flip_left_right(self.batch)
+        flip_nump = flip.numpy()
+        flip_nump_angle = flip_nump[1, :, :, 1]
+        flip_nump_angle = 180 * (flip_nump_angle != 0).astype(np.int) - 1 * flip_nump_angle
+        flip_nump[1, :, :, 1] = flip_nump_angle
+        flip = tf.convert_to_tensor(flip_nump)
+        self.add_im(flip)
+
+        # # To be deleted
         return flip[0], flip[1]
 
     def rotate(self, im, label, mini, angle=0):
@@ -78,6 +96,13 @@ class OnlineAugmentation(object):
         # rotation_filled = self.replace_0(rotation[0], mini)
         # rotation = tf.stack([rotation_filled, rotation[1]])
         rotation = self.replace_0(rotation, mini)
+        # To handle
+        rotation_nump = rotation.numpy()
+        rotation_nump_angle = rotation_nump[1, :, :, 1]
+        rotation_nump_angle[np.where(rotation_nump_angle != 0)] += angle
+        rotation_nump[1, :, :, 1] = rotation_nump_angle
+        rotation = tf.convert_to_tensor(rotation_nump)
+
         if self.assert_label(rotation[1]):
             self.add_im(rotation)
 
@@ -129,6 +154,7 @@ class OnlineAugmentation(object):
         :return: True if a valid grasping point is still in the image
                  False otherwise
         '''
+
         label_temp = label.numpy()
         label_temp[label_temp != 0] = 1
         if np.sum(label_temp) > 20:
@@ -182,25 +208,51 @@ if __name__=="__main__":
     im[0, 70:190, 100:105, :] = 1
     im[0, 70:80, 80:125, :] = 1
     best_idx = [125, 103]
-    print(-1)
-    hey = Trainer()
-    print(0)
-    hey.forward(im)
-
-    label= hey.compute_labels(1.9, best_idx)
-    print(2)
+    # print(-1)
+    # hey = Trainer()
+    # print(0)
+    # hey.forward(im)
+    # label = hey.compute_labels(1.9, best_idx)
+    # print(2)
+    # OA = OnlineAugmentation()
+    # print(3)
+    # OA.create_batch(im, label)
+    # print(4)
+    # flip, label_flip,_flip = OA.crop(im, label, zooming=200)
+    # print(5)
+    # OA.generate_batch(im, label)
+    best_pix_ind = [[105, 95, 25, 20, 20, 255], [105, 175, 0, 20, 20, 150]]
+    label = div.compute_labels(best_pix_ind)
     OA = OnlineAugmentation()
-    print(3)
-    OA.create_batch(im, label)
-    print(4)
-    flip, label_flip,_flip = OA.crop(im, label, zooming=200)
-    print(5)
-    OA.generate_batch(im, label)
+    crop, label_crop = OA.crop(im, label, zooming=200)
+    translate, label_translate = OA.translate(im, label, 0, pad_top=100)
+    rotate, label_rotate = OA.rotate(im, label, 0, angle=20)
+    flip, label_flip = OA.flip(im, label)
+    print(np.max(label_flip[:, :, 1]))
     # Visualisation
     viz = True
     if viz:
+        # plt.subplot(1, 2, 1)
+        # plt.imshow(crop.numpy())
+        # plt.subplot(1, 2, 2)
+        # plt.imshow(label_crop.numpy().astype(np.int))
+        # plt.show()
+        #
+        # plt.subplot(1, 2, 1)
+        # plt.imshow(translate.numpy())
+        # plt.subplot(1, 2, 2)
+        # plt.imshow(label_translate.numpy().astype(np.int))
+        # plt.show()
+
+        plt.subplot(1, 2, 1)
+        plt.imshow(rotate.numpy())
+        plt.subplot(1, 2, 2)
+        plt.imshow(label_rotate.numpy().astype(np.int))
+        plt.show()
+
         plt.subplot(1, 2, 1)
         plt.imshow(flip.numpy())
         plt.subplot(1, 2, 2)
-        plt.imshow(label_flip.numpy())
+        plt.imshow(label_flip.numpy().astype(np.int))
         plt.show()
+

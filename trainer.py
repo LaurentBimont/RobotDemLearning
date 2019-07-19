@@ -211,6 +211,8 @@ class Trainer(object):
     def main_without_backprop(self, im, best_pix, batch_size=1, augmentation_factor=4, demo=True):
         # label = self.compute_labels(1, best_pix, shape=im.shape)
         label = best_pix
+
+        ## Possible Merde Noire a cause du resize ##
         im = resize(im, (224, 224, 3), anti_aliasing=True)
         label = resize(label, (224, 224, 3), anti_aliasing=True)
         # plt.subplot(1, 2, 1)

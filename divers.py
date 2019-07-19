@@ -41,7 +41,6 @@ def angle2robotangle(angle):
         print(2)
         # angle += 180
     angle -= 180
-
     return angle
 
 def preprocess_depth_img(depth_image):
@@ -183,23 +182,47 @@ def compute_labels(best_pix_ind, shape=(224,224,3), viz=False):
     :param best_pix_ind: (Rectangle Parameters : x(colonne), y(ligne), angle(en degré), ecartement(en pixel)) Pixel where to perform the action
     :return: label : an 224x224 array where best pix is at future reward value
              label_weights : a 224x224 where best pix is at one
+
+    label is the a 224x224x3 array where
+        - First Channel is label
+        - Second Channel is the angle
+        - Third Channel is the spreading
     '''
     label = np.zeros(shape, dtype=np.float32)
+    print()
     for i in range(len(best_pix_ind)):
-        label_temp = np.zeros(shape, dtype=np.float32)
+        label_temp = np.zeros(shape[:2], dtype=np.float32)
+        angle_temp = np.zeros(shape[:2], dtype=np.float32)
+        ecart_temp = np.zeros(shape[:2], dtype=np.float32)
+
         x, y, angle, e, lp, label_val = best_pix_ind[i]
         rect = draw_rectangle(e, angle, x, y, lp)
-        cv2.fillConvexPoly(label_temp, rect, color=(255, 255, 255))
+        cv2.fillConvexPoly(label_temp, rect, color=(255))
+        print(label_temp.shape)
+        if label_val==255:
+            print('ici')
+            angle_temp[np.where(label_temp == 255)] = angle
+            ecart_temp[np.where(label_temp == 255)] = e
         label_temp[np.where(label_temp == 255)] = label_val
-        print('le minimax de label temp', np.min(label_temp), np.max(label_temp))
-        label = label + label_temp
-        print('Label', np.min(label), np.max(label))
-    label = resize(label, shape)
+        print('Voici le max', np.max(label_temp), np.min(label_temp))
+        label[:, :, 0] = label[:, :, 0] + label_temp
+        print('Maximum : ', np.min(label[:, :, 0]), np.max(label[:, :, 0]))
+        label[:, :, 1] = label[:, :, 1] + angle_temp
+        label[:, :, 2] = label[:, :, 2] + ecart_temp
+
+    print('Label', np.min(label), np.max(label))
+    print('les labels : ', np.min(label[:, :, 1]), np.max(label[:, :, 1]))
+    label = label.astype(np.int)
+    print('Label', np.min(label), np.max(label))
+    # label = resize(label, shape)
     print('Le label final')
-    plt.imshow(label)
-    plt.show()
+    # plt.imshow(label)
+    # plt.show()
     # label_test = (label - np.min(label))/(np.max(label)-np.min(label))
     # label_test = resize(label_test, (224, 224, 3))
     # plt.imshow(label_test)
     # plt.show()
     return label
+
+best_pix_ind = [[100, 200, 45, 20, 20, 255], [200, 100, 45, 20, 20, 150]]
+compute_labels(best_pix_ind)

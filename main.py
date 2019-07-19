@@ -32,7 +32,6 @@ def get_pred(camera, trainer):
     output_prob = trainer.forward(depth_image)
     out_numpy = output_prob.numpy()
 
-
     out = trainer.prediction_viz(out_numpy, depth_image)
 
     out = out.reshape((224, 224, 3))
@@ -82,9 +81,11 @@ def demo(nb_demo):
 
     depth_image = div.preprocess_depth_img(depth_image)
     label_plt = div.compute_labels(xp_param, shape=depth_image.shape)
+    print(label_plt.shape)
     print('Voici ce qui sera enregistré')
     plt.subplot(1, 2, 1)
     plt.imshow(label_plt[:, :, 0])
+
     plt.subplot(1, 2, 2)
     plt.imshow(depth_image)
     plt.show()
@@ -226,7 +227,7 @@ if __name__=="__main__":
     ######### Mise en Position #########
     # iiwa.home()
 
-    trainer = Trainer(savetosnapshot=True, load=False, snapshot_file='ampouletanh')
+    trainer = Trainer(savetosnapshot=False, load=False, snapshot_file='ampouletanh')
 
     ####### Clean Zone #######
     camera.start_pipe()
@@ -250,7 +251,7 @@ if __name__=="__main__":
             for f in explo_depth_label_file:
                 explo_depth_label.append(np.load(f))
 
-        test(trainer, isdemo=False, isgrasp=True, istrain=True, isreload=True)
+        test(trainer, isdemo=True, isgrasp=False, istrain=False, isreload=False)
         # validation(camera)
 
     except Exception as e:

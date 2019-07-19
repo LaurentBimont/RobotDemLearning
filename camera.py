@@ -18,8 +18,8 @@ class RealCamera:
 
     def start_pipe(self, align=True, usb3=True):
         if not self.pipelineStarted:
-            print('Caméra Ouverte')
             if align:
+                print('Etablissement de la connection caméra')
                 # Create a config and configure the pipeline to stream
                 #  different resolutions of color and depth streams
                 self.pipeline = rs.pipeline()
@@ -60,6 +60,7 @@ class RealCamera:
 
                 # Get Intrinsic parameters
                 self.get_intrinsic()
+                print('Caméra Ouverte')
 
     def stop_pipe(self):
         if self.pipelineStarted:
