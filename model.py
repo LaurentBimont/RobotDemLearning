@@ -144,16 +144,17 @@ class GraspNetTest(BaseDeepModel):
         # https://arxiv.org/abs/1502.03167
 
         self.bn0 = tf.keras.layers.BatchNormalization(name="grasp-b0")
-        self.conv0 = tf.keras.layers.Convolution2D(128, kernel_size=5, strides=1, activation=tf.nn.relu,
+        self.conv0 = tf.keras.layers.Convolution2D(128, kernel_size=3, strides=1, activation=tf.nn.relu,
                                                    use_bias=True, padding='same', name="grasp-conv0", trainable=True)
+
         self.bn1 = tf.keras.layers.BatchNormalization(name="grasp-b1")
 
-        self.drop1 = tf.keras.layers.Dropout(0.2)
-        self.conv1 = tf.keras.layers.Convolution2D(256, kernel_size=5, strides=1, activation=tf.nn.relu,
+        self.drop1 = tf.keras.layers.Dropout(0.1)
+        self.conv1 = tf.keras.layers.Convolution2D(256, kernel_size=3, strides=1, activation=tf.nn.relu,
                                                    use_bias=True, padding='same', name="grasp-conv1", trainable=True)
         self.bn2 = tf.keras.layers.BatchNormalization(name="grasp-b2")
 
-        self.drop2 = tf.keras.layers.Dropout(0.2)
+        self.drop2 = tf.keras.layers.Dropout(0.1)
         self.conv2 = tf.keras.layers.Convolution2D(1, kernel_size=1, strides=1, activation=tf.nn.tanh,
                                                    use_bias=False, padding='same', name="grasp-conv2", trainable=True)
         self.bn3 = tf.keras.layers.BatchNormalization(name="grasp-b2")
@@ -164,14 +165,13 @@ class GraspNetTest(BaseDeepModel):
 
     def call(self, inputs, bufferize=False, step_id=-1):
         # print('Entrée du réseau seondaire', inputs.shape)
-        x = self.bn0(inputs)
+        # x = self.bn0(inputs)
         x = self.conv0(inputs)
+        # x = self.drop1(x)
         x = self.bn1(x)
-        x = self.drop1(x)
         x = self.conv1(x)
+        # x = self.drop2(x)
         x = self.bn2(x)
-        x = self.drop2(x)
-        # x = self.tconv0(x)
         x = self.conv2(x)
         # x = self.bn3(x)
         # x = tf.multiply(3, x)
@@ -188,7 +188,6 @@ class GraspNetTest(BaseDeepModel):
         #                            tf.subtract(tf.reduce_max(x[i, :, :, :]), tf.reduce_min(x[i, :, :, :])))
         # x = tf.div(tf.subtract(x, tf.reduce_min(x)), tf.subtract(tf.reduce_max(x), tf.reduce_min(x)))
         return x
-
 
 class GraspNet(BaseDeepModel):
     def __init__(self):
@@ -248,8 +247,7 @@ class GraspNet(BaseDeepModel):
         pos = self.position_bn(self.position_conv(x)) 
         cos = self.cos_bn(self.cos_conv(x)) 
         sin = self.sin_bn(self.sin_conv(x)) 
-        width = self.width_bn(self.width_conv(x)) 
-            
+        width = self.width_bn(self.width_conv(x))
         return pos, cos, sin, width
     # x = self.bn3(x)
     # x = tf.multiply(3, x)
@@ -277,24 +275,25 @@ class Reinforcement(tf.keras.Model):
         self.PixNet = PixelNet()
         self.OnlyConvNet = OnlyConvNet()
         # self.my_trainable_variables = self.QGrasp.trainable_variables
-        
+
         # Initialize variables
         self.in_height, self.in_width = 0, 0
         self.scale_factor = 2.0
         self.padding_width = 0
         self.target_height = 0
         self.target_width = 0
-        
+
     def call(self, input):
         # x = self.QGrasp(self.VGG(input))
-        pos, cos, sin, width  = self.QGrasp(input)
+        # pos, cos, sin, width = self.QGrasp(input)
         # x = self.QGrasp(self.Dense(input))
         # x = self.PixNet(self.Dense(input))
         # x = self.QGrasp(input)
         # x = self.OnlyConvNet(input)
-        # x = self.QGraspTest(self.Dense(input))
-        return pos, cos, sin, width 
-        
+        x = self.QGraspTest(self.Dense(input))
+        # return pos, cos, sin, width
+        return x
+
 if __name__ == "__main__":
     im = np.ndarray((3, 224, 224, 3), np.float32)
     Densenet = Reinforcement()

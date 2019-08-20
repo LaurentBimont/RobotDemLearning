@@ -45,13 +45,15 @@ def angle2robotangle(angle):
 
 def preprocess_depth_img(depth_image):
     # depth_image[depth_image > 0.55] = 0 Commenté le 16 juillet
+    plt.imshow(depth_image)
+    plt.show()
     depth_image[depth_image > 0.45] = 0  # Rajouté le 16 juillet
-    depth_image[depth_image < 0.35] = 0
+    depth_image[depth_image < 0.4] = 0
     # depth_image[depth_image == 0] = np.mean(depth_image[depth_image != 0])  Commenté le 16 juillet
     depth_image[depth_image == 0] = np.max(depth_image[depth_image != 0])
-    min = second_min(depth_image.flatten())
     mini = np.min(depth_image.flatten())
-    depth_image = np.ones(depth_image.shape) - (depth_image - mini) / (depth_image.max() - mini)
+    # depth_image = np.ones(depth_image.shape) - (depth_image - mini) / (depth_image.max() - mini)
+    depth_image = np.ones(depth_image.shape) - (depth_image - 0.4) / (0.45 - 0.4)
     # depth_image[depth_image > 1] = 0
     depth_image = (depth_image * 255).astype('uint8')
     depth_image = np.asarray(np.dstack((depth_image, depth_image, depth_image)), dtype=np.uint8)
@@ -59,10 +61,8 @@ def preprocess_depth_img(depth_image):
 
 def second_min(vector):
     A = sorted(vector)
-    print(len(vector))
     for i in range(len(vector)):
         if A[i] != 0:
-            print(A[i], i)
             return A[i]
     return 0
 
@@ -117,13 +117,13 @@ def get_ecartement_pince(vp, theta, center, camera):
 
     u1 = int(u0 - sigma * np.cos(theta))
     v1 = int(v0 + sigma * np.sin(theta))
-    P1 = camera.transform_3D(u1,v1)
+    P1 = camera.transform_3D(u1, v1)
 
     e = np.sqrt((P0-P1).dot(P0-P1))
 
-    alpha = 1  
-
+    alpha = 1
     return e*alpha
+
     #  heightmap = im.copy()
    #  im2 = heightmap[:,:,1]
    #  im2 = (im2-np.min(im2))/(np.max(im2)-np.min(im2))
@@ -189,7 +189,7 @@ def compute_labels(best_pix_ind, shape=(224,224,3), viz=False):
         - Third Channel is the spreading
     '''
     label = np.zeros(shape, dtype=np.float32)
-    print()
+    print(best_pix_ind)
     for i in range(len(best_pix_ind)):
         label_temp = np.zeros(shape[:2], dtype=np.float32)
         angle_temp = np.zeros(shape[:2], dtype=np.float32)
@@ -199,23 +199,18 @@ def compute_labels(best_pix_ind, shape=(224,224,3), viz=False):
         rect = draw_rectangle(e, angle, x, y, lp)
         cv2.fillConvexPoly(label_temp, rect, color=(255))
         print(label_temp.shape)
-        if label_val==255:
+        if label_val==1:
             print('ici')
             angle_temp[np.where(label_temp == 255)] = angle
+            print(angle)
             ecart_temp[np.where(label_temp == 255)] = e
         label_temp[np.where(label_temp == 255)] = label_val
-        print('Voici le max', np.max(label_temp), np.min(label_temp))
         label[:, :, 0] = label[:, :, 0] + label_temp
-        print('Maximum : ', np.min(label[:, :, 0]), np.max(label[:, :, 0]))
         label[:, :, 1] = label[:, :, 1] + angle_temp
         label[:, :, 2] = label[:, :, 2] + ecart_temp
 
-    print('Label', np.min(label), np.max(label))
-    print('les labels : ', np.min(label[:, :, 1]), np.max(label[:, :, 1]))
     label = label.astype(np.int)
-    print('Label', np.min(label), np.max(label))
     # label = resize(label, shape)
-    print('Le label final')
     # plt.imshow(label)
     # plt.show()
     # label_test = (label - np.min(label))/(np.max(label)-np.min(label))

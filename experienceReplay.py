@@ -12,7 +12,7 @@ class ExperienceReplay:
         self.replay_buffer = []
         print('Cleaning Buffer')
 
-    def store(self, data, demo = False):
+    def store(self, data, demo=False):
         if len(self.header) != len(data):
             raise ValueError("wrong number of stored data {} expected vs {}".format(len(self.header), len(data)))
         self.replay_buffer.append(data)
@@ -34,8 +34,11 @@ class ExperienceReplay:
     def replay(self, batch_size=3):
         if self.data is not None:
             if len(self.data) != 0:
-                pow_law_exp = 2
-                rand_sample_idx = (np.random.power(pow_law_exp, batch_size)*(len(self.data)-1)).astype(np.int64)
+                if np.random.random()<0.2:
+                    pow_law_exp = 2
+                    rand_sample_idx = (np.random.power(pow_law_exp, batch_size)*(len(self.data)-1)).astype(np.int64)
+                else:
+                    rand_sample_idx = [int(np.random.random()*(len(self.data)-1))]
                 # print("max experience loss : {}".format(data["loss"].iloc[-1]))
                 # We sample batch_size number of actions in order to replay them. The more the loss the more the chance for an action to be taken
                 subsample = self.data.iloc[rand_sample_idx]
@@ -44,7 +47,6 @@ class ExperienceReplay:
                 # plt.subplot(1, 2, 2)
                 # plt.imshow(subsample['depth_heightmap'].values[0].numpy()[0, :, :, 0])
                 # plt.show()
-
                 # batch_img, batch_lab = tf.stack(data['depth_heightmap'].values),\
                 #                        tf.stack(data['label'].values)
 

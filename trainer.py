@@ -40,7 +40,7 @@ class Trainer(object):
         # Frequency
         self.viz_frequency = 25
         self.saving_frequency = 199
-        
+        self.only_second_min = da.OnlineAugmentation()
         # Initiate logger
         self.create_log()
         checkpoint_directory = "checkpoint_1"
@@ -62,9 +62,6 @@ class Trainer(object):
         # self.loss = tf.losses.mean_squared_error
         # self.loss = tf.losses.softmax_cross_entropy
 
-        ######                     Demonstration                            ######
-        self.best_idx = [125, 103]
-
     def custom_loss(self):
         '''
         As presented in 'Deep Q-learning from Demonstrations', the loss value is highly impacted by the
@@ -79,21 +76,23 @@ class Trainer(object):
         input = div.preprocess_img(input, target_height=self.scale_factor*224, target_width=self.scale_factor*224)
         # Pass input data through model
         self.output_prob = self.myModel(input)
-        self.batch, self.width, self.height = self.output_prob[0].shape[0], self.output_prob[0].shape[1], self.output_prob[0].shape[2]
+        self.batch, self.width, self.height = self.output_prob.shape[0], self.output_prob.shape[1], self.output_prob.shape[2]
         # Return Q-map
         return self.output_prob
 
     def compute_loss_dem(self, label, noBackprop=False):
         # expected_reward, action_reward = self.action.compute_reward(self.action.grasp, self.future_reward)
-        self.loss_value = 0
         for l, output in zip(label, self.output_prob):
-            l = self.reduced_label(l)
-            
-            self.loss_value += self.loss(l, output)
-
-        ######## Partie avec Tanh ########
+            l = self.reduced_label(l)[0]
+            l_numpy = l.numpy()
+            weight = np.zeros(l_numpy.shape)
+            weight[l_numpy > 0] = 2
+            weight[l_numpy < 0] = 1
+            weight[l_numpy == 0] = 0.2
+            self.loss_value = self.loss(l, output, weight)
 
         new_lab = label[0].numpy()
+        new_lab = new_lab.reshape((1, *new_lab.shape))
 
 
         ######## Partie avec Huber Loss  ############"
@@ -101,11 +100,11 @@ class Trainer(object):
         # weight[label_numpy > 0] = 1
         # weight[label_numpy < 0] = 3
         # weight[label_numpy == 0] = 0
-        #
+
         # new_lab *= 0.8
         # new_lab[label_numpy == 1] = 1
         # new_lab[label_numpy == -1] = 0
-        #
+
         # out_num = self.output_prob.numpy()[0, :, :, 0]
         # x_max, y_max = np.argmax(np.max(out_num, axis=1)), np.argmax(np.max(out_num, axis=0))
         # x_target, y_target = np.argmax(np.max(label_numpy, axis=1)), np.argmax(np.max(label_numpy, axis=0))
@@ -115,12 +114,7 @@ class Trainer(object):
         # # plt.show()
         # label = tf.convert_to_tensor(new_lab)
         # # print(new_lab[0, :, :, :].shape, self.output_prob[0,:,:,:].shape)
-        #
-        # # plt.subplot(1, 2, 1)
-        # # plt.imshow(new_lab[0, :, :, 0], vmin=0, vmax=1)
-        # # plt.subplot(1, 2, 2)
-        # # plt.imshow(self.output_prob[0, :, :, 0], vmin=0, vmax=1)
-        # # plt.show()
+
         # # self.loss_value = self.loss(label, self.output_prob, reduction=tf.losses.Reduction.SUM)
         # self.loss_value = self.loss(label, self.output_prob)
         #### Fin de la partie avec Huber Loss ####
@@ -132,7 +126,11 @@ class Trainer(object):
                 and (tf.train.get_global_step().numpy() % self.viz_frequency == 0) \
                 and (not noBackprop):
             print('Printing to Tensorboard')
-
+            # plt.subplot(1, 2, 1)
+            # plt.imshow(l[:, :, 0], vmin=-1, vmax=1)
+            # plt.subplot(1, 2, 2)
+            # plt.imshow(self.output_prob[0, :, :, 0], vmin=-1, vmax=1)
+            # plt.show()
             # plt.subplot(1, 3, 1)
             # plt.imshow(label_numpy[0, :, :, 0])
             # plt.subplot(1, 3, 2)
@@ -142,14 +140,13 @@ class Trainer(object):
             # plt.imshow(self.output_prob.numpy()[0, :, :, 0], vmin=0, vmax=1)
             # plt.scatter(y_max, x_max, color='red')
             # plt.show()
-
-            img_tensorboard = self.prediction_viz(self.output_prob, self.image)
-            img_tensorboard_target = self.prediction_viz(new_lab, self.image)
+            img_tensorboard = self.prediction_viz(self.output_prob[0], self.image)
+            img_tensorboard_target = self.prediction_viz(new_lab[0, :, :, :], self.image)
             subplot_viz = self.draw_scatter_subplot(img_tensorboard, img_tensorboard_target)
             self.log_fig('subplot_viz', subplot_viz)
             self.log_img('input', self.image)
             self.log_scalar('loss value_dem', self.loss_value)
-            output_prob_plt = self.draw_scatter(self.output_prob[0])
+            # output_prob_plt = self.draw_scatter(self.output_prob[0])
         # Saving a snapshot file
         if (self.savetosnapshot)\
                 and (tf.train.get_global_step() is not None)\
@@ -187,13 +184,13 @@ class Trainer(object):
     def reduced_label(self, label):
         '''Reduce label Q-map to the output dimension of the network
         :param label: 224x224 label map
-        :param label_weights:  224x224 label weights map
         :return: label and label_weights in output format
         '''
 
         label = tf.convert_to_tensor(label, np.float32)
         label = tf.image.resize_images(label, (self.width, self.height))
-        label = tf.reshape(label[:, :, :, 0], (self.batch, self.width, self.height, 1))
+        label = tf.reshape(label[:, :, 0], (self.batch, self.width, self.height, 1))
+
         if self.classifier_boolean:
             label = label.numpy()
             label[label > 0.] = 1
@@ -215,22 +212,24 @@ class Trainer(object):
     def main_without_backprop(self, im, best_pix, batch_size=1, augmentation_factor=4, demo=True):
         # label = self.compute_labels(1, best_pix, shape=im.shape)
         label = best_pix
+        im = tf.image.resize_images(im, (224, 224), method=tf.image.ResizeMethod.NEAREST_NEIGHBOR)
+        label = tf.image.resize_images(label, (224, 224), method=tf.image.ResizeMethod.NEAREST_NEIGHBOR)
+        # im = resize(im, (224, 224, 3), anti_aliasing=True)
+        # label = resize(label, (224, 224, 3), anti_aliasing=True)
 
-        ## Possible Merde Noire a cause du resize ##
-        im = resize(im, (224, 224, 3), anti_aliasing=True)
-        label = resize(label, (224, 224, 3), anti_aliasing=True)
         # plt.subplot(1, 2, 1)
         # plt.imshow(im[:, :, 0])
         # plt.subplot(1, 2, 2)
         # plt.imshow(label[:, :, 0])
         # plt.show()
         print('Data Augmentation')
-        self.dataset = da.OnlineAugmentation().generate_batch(im, label, np.mean(im), viz=False, augmentation_factor=augmentation_factor)
+        self.dataset = da.OnlineAugmentation().generate_batch(im, label, np.mean(im), viz=True, augmentation_factor=augmentation_factor)
 
         for batch in range(len(self.dataset['im'])//batch_size):
             batch_im, batch_label = self.random_batch(batch_size, self.dataset)
             self.forward(batch_im)
-            self.compute_loss_dem([batch_label,batch_label,batch_label, batch_label], noBackprop=True)
+            # self.compute_loss_dem([batch_label, batch_label, batch_label, batch_label], noBackprop=True)
+            self.compute_loss_dem(batch_label, noBackprop=True)
             self.exp_rpl.store([batch_im, batch_label, self.loss_value], demo)
             if batch % 20 == 0:
                 print('{}/{}'.format(batch, len(self.dataset['im'])//batch_size))
@@ -238,7 +237,7 @@ class Trainer(object):
     def main_xpreplay(self, nb_epoch=2, batch_size=3):
         self.exp_rpl.generate_ranking()
         for epoch in range(nb_epoch):
-            for batch in range(200):
+            for batch in range(60):
                 if batch % 20 == 0:
                     print('La valeur de perte : {}'.format(self.loss_value.numpy()))
                     print('Epoch {}/{}, Batch {}/{}'.format(epoch + 1, nb_epoch, batch + 1, 200))
@@ -246,6 +245,31 @@ class Trainer(object):
                 # plt.imshow(batch_im[0, :, :, 0])
                 # plt.show()
                 self.main_batches(batch_im, batch_lab)
+
+                # On tourne selon 4 angles pour essayer de résoudre le biais d'orientation observé lors des tests
+                sub = 1
+                for angle in [45*np.pi/180, 90*np.pi/180, 135*np.pi/180, np.pi]:
+                    new_batch = tf.stack([batch_im[0], batch_lab[0]])
+                    rotation = tf.contrib.image.rotate(new_batch, angles=angle)
+                    mini = div.second_min(batch_im[0].numpy().flatten())
+                    rotation = self.only_second_min.replace_0(rotation, mini)
+
+                    rotation_im, rotation_lab = tf.reshape(rotation[0], (1, *rotation[0].shape)), tf.reshape(rotation[1],
+                                                                                                             (1, *rotation[1].shape))
+                    self.main_batches(rotation_im, rotation_lab)
+
+                    # On tourne de haut en bas : pour esssayer de résoudre le biais d'orientation observé lors des tests
+                    new_batch = tf.stack([rotation_im[0], rotation_lab[0]])
+                    flip = tf.image.flip_up_down(new_batch)
+                    flip_im, flip_lab = tf.reshape(flip[0], (1, *flip[0].shape)), tf.reshape(flip[1], (1, *flip[1].shape))
+                    self.main_batches(flip_im, flip_lab)
+
+                    # plt.subplot(4, 2, sub)
+                    # plt.imshow(tf.cast(rotation[0], tf.int64))
+                    # plt.subplot(4, 2, sub+4)
+                    # plt.imshow(tf.cast(flip[0], tf.int64))
+                    # sub += 1
+                # plt.show()
 
     def random_batch(self, batch_size, dataset):
         im_o, label_o = dataset['im'], dataset['label']
@@ -282,7 +306,6 @@ class Trainer(object):
                 # plt.imshow(batch_im.numpy()[0, :, :, 0])
                 # plt.show()
                 self.main_batches(batch_im, batch_lab)
-
         # batch_im, batch_lab = self.exp_rpl.replay()
         # self.main_batches(batch_im, batch_lab)
         print('Finish XP replay')
@@ -299,10 +322,11 @@ class Trainer(object):
 
     def prediction_viz(self, qmap, im):
         # Version Tanh
-        qmap = (qmap[0, :, :, :] + 1) / 2
+        qmap = (qmap + 1) / 2
         qmap = tf.image.resize_images(qmap, (self.width, self.height))
         qmap = tf.image.resize_images(qmap, (224, 224), method=tf.image.ResizeMethod.NEAREST_NEIGHBOR)
-        qmap = tf.reshape(qmap, (224, 224))
+
+        qmap = tf.reshape(qmap[:, :, 0], (224, 224))
         # Version Huber Loss
         # qmap = qmap[0, :, :, :]
         # qmap = tf.image.resize_images(qmap, (self.width, self.height))
@@ -312,7 +336,7 @@ class Trainer(object):
         x_map, y_map = np.argmax(np.max(qmap, axis=1)), np.argmax(np.max(qmap, axis=0))
         rescale_qmap = qmap
         img = np.zeros((224, 224, 3))
-        img[:, :, 0] = im[0, :, :, 0] / np.max(im[0,:,:,0])
+        img[:, :, 0] = im[0, :, :, 0] / np.max(im[0, :, :, 0])
         img[:, :, 1] = rescale_qmap
         img[x_map-5:x_map+5, y_map-5:y_map+5, 2] = 1
         img = img   # To resize between 0 and 1 : to display with output probability

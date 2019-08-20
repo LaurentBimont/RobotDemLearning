@@ -21,6 +21,11 @@ class OnlineAugmentation(object):
         self.original_size = (224, 224)
 
     def replace_0(self, batch, second_min):
+        '''
+        :param batch: les variables à traiter
+        :param second_min: la valeur la plus faible après 0 de la depthmap
+        :return: le batch sans 0 pour la depthmap
+        '''
         condition = tf.equal(batch[0], 0)
         case_true = tf.ones(batch[0].shape)*float(second_min)
         case_false = batch[0]
@@ -154,10 +159,9 @@ class OnlineAugmentation(object):
         :return: True if a valid grasping point is still in the image
                  False otherwise
         '''
-
-        label_temp = label.numpy()
+        label_temp = label.numpy()[:, :, 0]
         label_temp[label_temp != 0] = 1
-        if np.sum(label_temp) > 20:
+        if np.sum(label_temp) > 30:
             return True
         return False
 
@@ -175,14 +179,15 @@ class OnlineAugmentation(object):
             ima, lab = self.crop(im, label, zooming=np.random.randint(150, 223))
             if self.assert_label(lab):
                 for j in range(augmentation_factor):
-                    ima, lab = self.translate(ima, lab, mini,
-                                                     pad_top=np.random.randint(0, 50),
-                                                     pad_left=np.random.randint(0, 50),
-                                                     pad_bottom=np.random.randint(0, 50),
-                                                     pad_right=np.random.randint(0, 50))
+                    ima, lab = self.rotate(ima, lab, mini, angle=np.random.rand() * 0.785)
+
                     if self.assert_label(lab):
                         for k in range(augmentation_factor):
-                            ima, lab = self.rotate(ima, lab, mini, angle=np.random.rand()*0.785)
+                            ima, lab = self.translate(ima, lab, mini,
+                                                      pad_top=np.random.randint(0, 50),
+                                                      pad_left=np.random.randint(0, 50),
+                                                      pad_bottom=np.random.randint(0, 50),
+                                                      pad_right=np.random.randint(0, 50))
                             if viz:
                                 if self.assert_label(lab):
 
@@ -199,7 +204,6 @@ class OnlineAugmentation(object):
         if viz:
             plt.show()
         return self.general_batch
-
 
 if __name__=="__main__":
     tf.enable_eager_execution()

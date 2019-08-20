@@ -13,12 +13,24 @@ from os.path import isfile, join
 import divers as div
 from trainer import Trainer
 from robot import Robot
+
 from fingertracking import FingerTracker
 from camera import RealCamera
 
 #########Fonction pour la lisbilité #########
 
-def get_pred(trainer):
+## A virer ##
+def get_precomputedFrame(camera):
+    depth_image, _ = camera.get_frame()
+    plt.subplot(1, 2, 1)
+    plt.imshow(depth_image)
+    depth_image = div.preprocess_depth_img(depth_image)
+    plt.subplot(1, 2, 2)
+    plt.imshow(depth_image)
+    plt.show()
+    np.save('./Experiences/Demonstration/tournevis/tournevis1.npy', depth_image)
+
+def get_pred(camera, trainer):
     depth_image, _ = camera.get_frame()
     depth = np.copy(depth_image)
 
@@ -63,7 +75,7 @@ def get_pred(trainer):
 
 def demo(nb_demo):
     xp_param = []
-    x, y = 0,0
+    x, y = 0, 0
     keep, other_point = '0', '1'
     while other_point == '1':
         while keep == '0':
@@ -87,12 +99,16 @@ def demo(nb_demo):
     plt.subplot(1, 2, 1)
     plt.imshow(label_plt[:, :, 0])
 
+def validation(camera):
+    nb_demo = 0
+    nb_trial = 0
+
     plt.subplot(1, 2, 2)
     plt.imshow(depth_image)
     plt.show()
     np.save('./Experiences/Demonstration/depth_label/depth_parameters_demo{}.npy'.format(nb_demo), (depth_image, label_plt))
 
-    demo_depth_label.append((depth_image, label_plt))
+    # demo_depth_label.append((depth_image, label_plt))
     return x, y
 
 def learning(demo_depth_label, explo_depth_label, trainer):
@@ -103,9 +119,14 @@ def learning(demo_depth_label, explo_depth_label, trainer):
 
         ### Create experience replay ranking
         for depth, label in demo_depth_label:
+            plt.subplot(1, 2, 1)
+            plt.imshow(depth)
+            plt.subplot(1, 2, 2)
+            plt.imshow(label)
+            plt.show()
             trainer.main_without_backprop(depth,
                                             label,
-                                            augmentation_factor=2,
+                                            augmentation_factor=4,
                                             demo=True)
         for depth, label in explo_depth_label:
             trainer.main_without_backprop(depth,
@@ -114,12 +135,12 @@ def learning(demo_depth_label, explo_depth_label, trainer):
                                             demo=False)
             print('starting main training')
         ### Train with experienceReplay replay
-    trainer.main_xpreplay(nb_epoch=1 , batch_size=1)
+    trainer.main_xpreplay(nb_epoch=4, batch_size=1)
     return trainer
 
 def viz_grap(trainer):
+    x_pred, y_pred, angle_pred, e_pred, depth = get_pred(camera, trainer)
 
-    x_pred, y_pred, angle_pred, e_pred, depth = get_pred(trainer)
 
 def grasping(nb_trial):
     x_pred, y_pred, angle_pred, e_pred, depth = get_pred(camera, trainer)
@@ -144,7 +165,9 @@ def grasping(nb_trial):
     explo_depth_label.append((depth_image, label_plt))
     return x_pred, y_pred
 
+
 def load():
+    demo_depth_label, explo_depth_label = [], []
     demo_depth_label_file = [join('Experiences/Demonstration/depth_label/', f) for f in
                              listdir('Experiences/Demonstration/depth_label/') if
                              isfile(join('Experiences/Demonstration/depth_label/', f))]
@@ -154,46 +177,93 @@ def load():
     explo_depth_label_file = [join('Experiences/Exploration/depth_label/', f) for f in
                               listdir('Experiences/Exploration/depth_label/') if
                               isfile(join('Experiences/Exploration/depth_label/', f))]
+
     for f in explo_depth_label_file:
         explo_depth_label.append(np.load(f))
+
     return demo_depth_label, explo_depth_label
+
 
 def proj_dist(p1, p2):
     d = p1[:2]-p2[:2]
     d = np.sqrt(np.dot(d, d))
     return d
 
-def test(trainer, isdemo, isgrasp, istrain, isreload, ):
+
+def test(trainer, dodemo, dograsp, dotrain, doreload, ):
     nb_demo, nb_trial = 0, 0
     demo_depth_label = []
-    if isreload:
+    if doreload:
         demo_depth_label, explo_depth_label = load()
-    if isdemo:
+    if dodemo:
         _, _ = demo(nb_demo)
         nb_demo += 1
         demo_depth_label, explo_depth_label = load()
-    if istrain:
+    if dotrain:
         trainer = learning(demo_depth_label, explo_depth_label, trainer)
-    if isgrasp:
+    if dograsp:
         cont = '1'
         nb_attempt = 0
-        while cont=='1':
+        while cont == '1':
             viz_grap(trainer)
             # grasping(nb_attempt)
             nb_attempt += 1
             cont = input('Voulez vous continuer ? ')
         # grasping(nb_trial)
 
+
+def main_distance(trainer, dodemo, dograsp, dotrain, doreload):
+    nb_demo, nb_trial = 0, 0
+    demo_depth_label = []
+    if doreload:
+        demo_depth_label, explo_depth_label = load()
+
+    if dodemo:
+        _, _ = demo(nb_demo)
+        nb_demo += 1
+        demo_depth_label, explo_depth_label = load()
+    if dotrain:
+        trainer = learning(demo_depth_label, explo_depth_label, trainer)
+
+    if dograsp:
+        cont = '1'
+        nb_attempt = 0
+        while cont == '1':
+            x_pred, y_pred, _, _, depth = get_pred(camera, trainer)
+
+            # Transfer the predicting grasping point into robot cartesian coordinates
+            pred_point3D = camera.transform_3D(x_pred, y_pred, depth)
+            # Transfer the true grasping point into robot cartesian coordinates
+            ref_point = FT.detect_blue(camera)[0]
+            ref_point3D = camera.transform_3D(*ref_point)
+            d2 = proj_dist(ref_point3D, pred_point3D)
+            plt.imshow(depth)
+            plt.scatter(ref_point[0], ref_point[1], color='red')
+            plt.scatter(x_pred, y_pred, color='black')
+            plt.show()
+            with open("distance.csv", "a+") as f:
+                print("distance ref decision : {} ".format(d2))
+                line = ";".join(map(str, [d2, ref_point3D, pred_point3D, "\n"]))
+                print(line)
+                f.write(line)
+            print('Tentative numéro {}'.format(nb_attempt))
+            nb_attempt += 1
+
+            cont = input('Voulez vous continuer ? ')
+        # grasping(nb_trial)
+
+
 def validation(camera):
     nb_demo = 0 
     nb_trial = 0 
 
-    while True: 
+    while True:
         try:
+            # Spot the blue pellet on the tool
             ref_point = FT.detect_blue(camera)[0]
             ref_point3D = camera.transform_3D(*ref_point)
 
-            for i in range(2): 
+            for i in range(2):
                 demo_point = demo(nb_demo, demo_depth_label)
                 demo_point3D = camera.transform_3D(*demo_point)
                 nb_demo += 1
@@ -222,41 +292,79 @@ def validation(camera):
 if __name__=="__main__":
     ######### Initialisation des différents outils #########
     # iiwa = Robot()
-    ######### Mise en Position #########
+    camera = RealCamera()
+    FT = FingerTracker()
+    time.sleep(1)
     # iiwa.home()
+    ### Quel test va-t-on jouer ? ###
+    testgeneral = False
+    test2 = True
 
-    trainer = Trainer(savetosnapshot=False, load=False, snapshot_file='ampouletanh')
+    ### Test Général ###
+    if testgeneral:
+        trainer = Trainer(savetosnapshot=False, load=False, snapshot_file='ampouletanh')
+        camera.start_pipe()
+        time.sleep(1)
+        camera_param = [camera.intr.fx, camera.intr.fy, camera.intr.ppx, camera.intr.ppy, camera.depth_scale]
+        get_precomputedFrame(camera)
+        load_needed = False
+        demo_depth_label = []
+        explo_depth_label = []
+        try:
+            if load_needed:
+                demo_depth_label_file = [join('Experiences/Demonstration/depth_label/', f) for f in listdir('Experiences/Demonstration/depth_label/') if
+                                isfile(join('Experiences/Demonstration/depth_label/', f))]
+                for f in demo_depth_label_file:
+                    demo_depth_label.append(np.load(f))
 
-    ####### Clean Zone #######
+                explo_depth_label_file = [join('Experiences/Exploration/depth_label/', f) for f in listdir('Experiences/Exploration/depth_label/') if
+                                                isfile(join('Experiences/Exploration/depth_label/', f))]
+                for f in explo_depth_label_file:
+                    explo_depth_label.append(np.load(f))
 
-    ### Paramètre à toucher ###
-    load_needed = False
+            test(trainer, dodemo=False, dograsp=False, dotrain=False, doreload=False)
+            # validation(camera)
+        except Exception as e:
+            exc_info = sys.exc_info()
+            traceback.print_exception(*exc_info)
+            del exc_info
+            pass
 
-    demo_depth_label = []
-    explo_depth_label = []
-    try:
-        if load_needed:
-            demo_depth_label_file = [join('Experiences/Demonstration/depth_label/', f) for f in listdir('Experiences/Demonstration/depth_label/') if
-                            isfile(join('Experiences/Demonstration/depth_label/', f))]
-            for f in demo_depth_label_file:
-                demo_depth_label.append(np.load(f))
+        except RuntimeError as e:
+            exc_info = sys.exc_info()
+            traceback.print_exception(*exc_info)
+            # iiwa.iiwa.close()
 
-            explo_depth_label_file = [join('Experiences/Exploration/depth_label/', f) for f in listdir('Experiences/Exploration/depth_label/') if
-                                            isfile(join('Experiences/Exploration/depth_label/', f))]
-            for f in explo_depth_label_file:
-                explo_depth_label.append(np.load(f))
+    if test2:
+        load_trained_network = True
+        snapshot_file = 'clef_test_1'
+        camera.start_pipe()
+        time.sleep(1)
+        camera_param = [camera.intr.fx, camera.intr.fy, camera.intr.ppx, camera.intr.ppy, camera.depth_scale]
+        get_precomputedFrame(camera)
 
-        test(trainer, isdemo=True, isgrasp=False, istrain=False, isreload=False)
-        # validation(camera)
+        try:
+            if load_trained_network:
+                trainer = Trainer(savetosnapshot=False, load=True, snapshot_file=snapshot_file)
+            else:
+                trainer = Trainer(savetosnapshot=True, load=False, snapshot_file=snapshot_file)
+                main_distance(trainer, dodemo=False, dotrain=True, dograsp=False, doreload=True)
 
-    except Exception as e:
-        exc_info = sys.exc_info()
-        traceback.print_exception(*exc_info)
-        del exc_info
-        pass
-    except RuntimeError as e:
-        exc_info = sys.exc_info()
-        traceback.print_exception(*exc_info)
+            main_distance(trainer, dograsp=True, dodemo=False, dotrain=False, doreload=False)
+            # validation(camera)
+            camera.stop_pipe()
 
-        # iiwa.iiwa.close()
+        except Exception as e:
+            exc_info = sys.exc_info()
+            traceback.print_exception(*exc_info)
+            camera.stop_pipe()
+            # iiwa.iiwa.close()
+            del exc_info
+            pass
+
+        except RuntimeError as e:
+            exc_info = sys.exc_info()
+            traceback.print_exception(*exc_info)
+            camera.stop_pipe()
+            # iiwa.iiwa.close()
 

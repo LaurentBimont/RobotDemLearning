@@ -213,7 +213,7 @@ class FingerTracker(object):
         t0 = time.time()
         self.min_over_time = np.inf
         self.list_ref = [] 
-        while (time.time() - t0) < 1000 and (self.list_ref == [] or len(self.list_ref)!=1) :
+        while (time.time() - t0) < 10 and (self.list_ref == [] or len(self.list_ref)!=1) :
             print(time.time() - t0)
             first_cont, second_cont = None, None
 
@@ -289,7 +289,6 @@ class FingerTracker(object):
 
 
     def get_frame_without_hand(self, camera):
-        self.depth_without_hand, self.frame_without_hand = camera.get_frame()
         self.depth_without_hand, self.frame_without_hand = camera.get_frame()
         return self.depth_without_hand, self.frame_without_hand
 
