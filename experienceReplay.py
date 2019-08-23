@@ -31,10 +31,10 @@ class ExperienceReplay:
                 self.data = self.data.iloc[-1000:]
             print(self.data.shape)
 
-    def replay(self, batch_size=3):
+    def replay(self, random_param, batch_size=3):
         if self.data is not None:
             if len(self.data) != 0:
-                if np.random.random()<0.2:
+                if np.random.random()<random_param:
                     pow_law_exp = 2
                     rand_sample_idx = (np.random.power(pow_law_exp, batch_size)*(len(self.data)-1)).astype(np.int64)
                 else:

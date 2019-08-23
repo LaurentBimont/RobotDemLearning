@@ -15,7 +15,7 @@ import matplotlib.pyplot as plt
 import divers as div
 import cv2
 import scipy as sc
-import dataAugmentation as da
+import dataAugmentationBIS as da
 import tfmpl                             # Put matplotlib figures in tensorboard
 import os
 from skimage.transform import resize
@@ -59,8 +59,16 @@ class Trainer(object):
             print('Pre-trained model snapshot loaded from: {}'.format(latest_snapshot_file))
         # else:
         self.loss = tf.losses.huber_loss
+
         # self.loss = tf.losses.mean_squared_error
         # self.loss = tf.losses.softmax_cross_entropy
+
+        # Initialize the network with a fake shot
+        self.forward(np.zeros((1, 224, 224, 3), np.float32))
+        self.vars = self.myModel.trainable_variables
+
+        lossL2 = tf.add_n([tf.nn.l2_loss(v) for v in self.vars])
+        print(lossL2)
 
     def custom_loss(self):
         '''
@@ -86,14 +94,21 @@ class Trainer(object):
             l = self.reduced_label(l)[0]
             l_numpy = l.numpy()
             weight = np.zeros(l_numpy.shape)
-            weight[l_numpy > 0] = 2
-            weight[l_numpy < 0] = 1
-            weight[l_numpy == 0] = 0.2
-            self.loss_value = self.loss(l, output, weight)
+
+            weight = np.abs(output.numpy())
+            weight[l_numpy > 0] += 10/(np.sum(l_numpy > 0)+1)       #Initialement 2.
+            weight[l_numpy < 0] += 10/(np.sum(l_numpy < 0)+1)       #Initialement 1.
+            weight[l_numpy == 0] += 1/(np.sum(l_numpy == 0)+1)      #Initialement 0.2
+            # print('Les poids : ', 1/(np.sum(l_numpy > 0)+1), 1/(np.sum(l_numpy < 0)+1), 1/(np.sum(l_numpy == 0)+1))
+
+            lossL2 = tf.add_n([tf.nn.l2_loss(v) for v in self.vars])
+            self.loss_value = self.loss(l, output, weight) + 0.0000005 * lossL2
+
+            print('Contribution des loss : Huber ({}) et L2 reg ({})'.format(self.loss(l, output, weight)/self.loss_value,
+                  0.0000005*lossL2/self.loss_value))
 
         new_lab = label[0].numpy()
         new_lab = new_lab.reshape((1, *new_lab.shape))
-
 
         ######## Partie avec Huber Loss  ############"
         # weight = np.zeros(label_numpy.shape)
@@ -199,6 +214,22 @@ class Trainer(object):
 
     def main_batches(self, im, label):
         self.future_reward = 1
+        # On change le label pour que chaque pixel sans objet soit considéré comme le background
+        im_numpy, label_numpy = im.numpy(), label.numpy()
+        mask = (im_numpy>20).astype(np.int32)
+        label_numpy = label_numpy * mask
+        ## Visualisation du nouveau label
+        # viz_fig = np.zeros(label_numpy[0].shape)
+        # viz_fig[:, :, 0] = im_numpy[0, :, :, 0]
+        # viz_fig[:, :, 1] = 255*label_numpy[0, :, :, 0]
+        # plt.subplot(1, 3, 1)
+        # plt.imshow(label_numpy[0].astype(np.int))
+        # plt.subplot(1, 3, 2)
+        # plt.imshow(im_numpy[0].astype(np.int))
+        # plt.subplot(1, 3, 3)
+        # plt.imshow(viz_fig.astype(np.int))
+        # plt.show()
+        label = tf.convert_to_tensor(label_numpy, dtype=tf.float32)
         with tf.GradientTape(watch_accessed_variables=False) as tape:
             tape.watch(self.myModel.trainable_variables)
             self.forward(im)
@@ -223,7 +254,7 @@ class Trainer(object):
         # plt.imshow(label[:, :, 0])
         # plt.show()
         print('Data Augmentation')
-        self.dataset = da.OnlineAugmentation().generate_batch(im, label, np.mean(im), viz=True, augmentation_factor=augmentation_factor)
+        self.dataset = da.OnlineAugmentation().generate_batch(im.numpy(), label.numpy(), np.mean(im), augmentation_factor=augmentation_factor, viz=False)
 
         for batch in range(len(self.dataset['im'])//batch_size):
             batch_im, batch_label = self.random_batch(batch_size, self.dataset)
@@ -234,36 +265,45 @@ class Trainer(object):
             if batch % 20 == 0:
                 print('{}/{}'.format(batch, len(self.dataset['im'])//batch_size))
 
-    def main_xpreplay(self, nb_epoch=2, batch_size=3):
+    def main_xpreplay(self, nb_epoch=2, batch_size=3, nb_batch=400):
         self.exp_rpl.generate_ranking()
         for epoch in range(nb_epoch):
-            for batch in range(60):
+
+            for batch in range(nb_batch):
                 if batch % 20 == 0:
                     print('La valeur de perte : {}'.format(self.loss_value.numpy()))
-                    print('Epoch {}/{}, Batch {}/{}'.format(epoch + 1, nb_epoch, batch + 1, 200))
-                batch_im, batch_lab = self.exp_rpl.replay(batch_size=batch_size)
+                    print('Epoch {}/{}, Batch {}/{}'.format(epoch + 1, nb_epoch, batch + 1, nb_batch))
+                batch_im, batch_lab = self.exp_rpl.replay(0.7, batch_size=batch_size)
                 # plt.imshow(batch_im[0, :, :, 0])
                 # plt.show()
                 self.main_batches(batch_im, batch_lab)
 
                 # On tourne selon 4 angles pour essayer de résoudre le biais d'orientation observé lors des tests
                 sub = 1
-                for angle in [45*np.pi/180, 90*np.pi/180, 135*np.pi/180, np.pi]:
-                    new_batch = tf.stack([batch_im[0], batch_lab[0]])
-                    rotation = tf.contrib.image.rotate(new_batch, angles=angle)
-                    mini = div.second_min(batch_im[0].numpy().flatten())
-                    rotation = self.only_second_min.replace_0(rotation, mini)
 
-                    rotation_im, rotation_lab = tf.reshape(rotation[0], (1, *rotation[0].shape)), tf.reshape(rotation[1],
-                                                                                                             (1, *rotation[1].shape))
-                    self.main_batches(rotation_im, rotation_lab)
-
-                    # On tourne de haut en bas : pour esssayer de résoudre le biais d'orientation observé lors des tests
-                    new_batch = tf.stack([rotation_im[0], rotation_lab[0]])
-                    flip = tf.image.flip_up_down(new_batch)
-                    flip_im, flip_lab = tf.reshape(flip[0], (1, *flip[0].shape)), tf.reshape(flip[1], (1, *flip[1].shape))
-                    self.main_batches(flip_im, flip_lab)
-
+########################################################################################################################
+################# Mise en Commentaire de cela : Potentiellement a remettre par la suite ################################
+########################################################################################################################
+                #
+                # for angle in [45*np.pi/180, 90*np.pi/180, 135*np.pi/180, np.pi]:
+                #     new_batch = tf.stack([batch_im[0], batch_lab[0]])
+                #     rotation = tf.contrib.image.rotate(new_batch, angles=angle)
+                #     mini = div.second_min(batch_im[0].numpy().flatten())
+                #     rotation = self.only_second_min.replace_0(rotation, mini)
+                #
+                #     rotation_im, rotation_lab = tf.reshape(rotation[0], (1, *rotation[0].shape)), tf.reshape(rotation[1],
+                #                                                                                              (1, *rotation[1].shape))
+                #     self.main_batches(rotation_im, rotation_lab)
+                #
+                #     # On tourne de haut en bas : pour esssayer de résoudre le biais d'orientation observé lors des tests
+                #     new_batch = tf.stack([rotation_im[0], rotation_lab[0]])
+                #     flip = tf.image.flip_up_down(new_batch)
+                #     flip_im, flip_lab = tf.reshape(flip[0], (1, *flip[0].shape)), tf.reshape(flip[1], (1, *flip[1].shape))
+                #     self.main_batches(flip_im, flip_lab)
+                #
+########################################################################################################################
+################################## Fin de la zone mise en commentaire ##################################################
+########################################################################################################################
                     # plt.subplot(4, 2, sub)
                     # plt.imshow(tf.cast(rotation[0], tf.int64))
                     # plt.subplot(4, 2, sub+4)
@@ -366,10 +406,7 @@ class Trainer(object):
 
         fig = tfmpl.create_figure()
         ax = fig.add_subplot(122)
-
         ax.imshow(data1[:, :, :])
-
-
         ax = fig.add_subplot(121)
         try:
             ax.imshow(data2[:, :, :])
@@ -417,6 +454,7 @@ if __name__=='__main__':
     # best_pix = [83, 76, 0, 30, 10]         # x, y, angle, e, lp
 
     out = Network.forward(im)
+    print(out.shape)
     viz = Network.prediction_viz(out, im)
     np.save('outputforFrancois.npy', viz)
     plt.imshow(viz)

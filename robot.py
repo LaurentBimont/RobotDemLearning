@@ -174,6 +174,7 @@ class Robot:
         home = [595, 15.9, 353, 1.60, 0, 2.77] # Orientation camera vers l'arrière
         goto = [383, -2.13, 250, -1.63, 0, 2.72] # Orientation camera vers l'avant
         angular_home = [0.19611477, 0.430804, -0.30726947, -1.47291056, 0.10567891, 1.67921869, -1.63443118]
+        angular_home = [0.19540027, 0.43081131, -0.30892252, -1.47040016, 0.12090041, 1.62190036, -1.64482995]
         # angular_home = [ 0.22088622,  0.660586  , -0.30721297, -1.63273026,  0.19087189,
         # 1.30512739, -1.66725927] 
         self.iiwa.movePTPJointSpace(angular_home, 0.50)
@@ -207,32 +208,30 @@ def onclick(event):
 
 if __name__=="__main__":
     rob = Robot()
-    print(rob.getCart())
+    rob.home()
+    print(rob.getCart(), rob.iiwa.getJointsPos())
 
     try:
-        camera = RealCamera()
-        camera.start_pipe()
-        camera_param = [camera.intr.fx, camera.intr.fy, camera.intr.ppx, camera.intr.ppy, camera.depth_scale]
-        camera.get_frame()
-        print(camera.color_image)
-        rob = Robot()
-        print(rob.getCart())
-        rob.home()
-        print('Joint Position', rob.iiwa.getJointsPos())
-        cart = rob.from_camera2robot(camera.depth_image, 241, 290, color=camera.color_image, camera_param=camera_param, test_manuel=True)
-        # rob.moveto([[450, -2.13, 329]])
-        OK = input('Move à la position cartésienne : {}  Est-ce OK ? (oui : 1)'.format(cart))
-        rob.moveto(cart)
-        ang = [-1.5, 0., np.pi]
-        rob.grasp(cart, ang)
-        print('Position Cartésienne atteinte', rob.getCart())
-        rob.camera.stop_pipe()
+        # camera = RealCamera()
+        # camera.start_pipe()
+        # camera_param = [camera.intr.fx, camera.intr.fy, camera.intr.ppx, camera.intr.ppy, camera.depth_scale]
+        # camera.get_frame()
+        # print(camera.color_image)
+        # rob = Robot()
+        # print(rob.getCart())
+        # rob.home()
+        # print('Joint Position', rob.iiwa.getJointsPos())
+        # cart = rob.from_camera2robot(camera.depth_image, 241, 290, color=camera.color_image, camera_param=camera_param, test_manuel=True)
+        # # rob.moveto([[450, -2.13, 329]])
+        # OK = input('Move à la position cartésienne : {}  Est-ce OK ? (oui : 1)'.format(cart))
+        # rob.moveto(cart)
+        # ang = [-1.5, 0., np.pi]
+        # rob.grasp(cart, ang)
+        # print('Position Cartésienne atteinte', rob.getCart())
+        # rob.camera.stop_pipe()
         rob.iiwa.close()
     except Exception as e:
         exc_info = sys.exc_info()
         print(e)
         rob.camera.stop_pipe()
         rob.iiwa.close()
-    finally:
-        traceback.print_exception(*exc_info)
-        del exc_info

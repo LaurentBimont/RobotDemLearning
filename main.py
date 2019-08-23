@@ -17,7 +17,7 @@ from robot import Robot
 from fingertracking import FingerTracker
 from camera import RealCamera
 
-#########Fonction pour la lisbilité #########
+#########Fonction pour la lisibilité #########
 
 ## A virer ##
 def get_precomputedFrame(camera):
@@ -66,7 +66,10 @@ def get_pred(camera, trainer):
         # plt.savefig('pred{}.png'.format(i), dpi=600)
         # if execute=='1':
         plt.subplot(2, 2, 3)
-        plt.imshow(copy_depth[0, :, :, :])
+        cop_copy_depth = copy_depth[0, :, :, :]
+        cop_copy_depth[cop_copy_depth==0.] = np.max(cop_copy_depth)
+        plt.imshow(cop_copy_depth)
+
         # plt.scatter(int(x_pred), int(y_pred))
         plt.subplot(2, 2, 3)
         plt.imshow(out[:, :, 1])
@@ -98,6 +101,11 @@ def demo(nb_demo):
     print('Voici ce qui sera enregistré')
     plt.subplot(1, 2, 1)
     plt.imshow(label_plt[:, :, 0])
+    plt.show()
+    np.save('./Experiences/Demonstration/depth_label/depth_parameters_demo{}.npy'.format(nb_demo),
+            (depth_image, label_plt))
+    return x, y
+
 
 def validation(camera):
     nb_demo = 0
@@ -112,8 +120,9 @@ def validation(camera):
     return x, y
 
 def learning(demo_depth_label, explo_depth_label, trainer):
-    quefaire = input('Recalculer la DataFrame ? (oui:1), (non : 2)')
-    if quefaire == '1':
+    nb_epoch = 4
+    for i in range(nb_epoch):
+        print('#### EPOCH {}/{} ####'.format(i+1, nb_epoch))
         trainer.exp_rpl.clean()
         print('Experience Replay reset is finished')
 
@@ -126,7 +135,7 @@ def learning(demo_depth_label, explo_depth_label, trainer):
             plt.show()
             trainer.main_without_backprop(depth,
                                             label,
-                                            augmentation_factor=4,
+                                            augmentation_factor=6,
                                             demo=True)
         for depth, label in explo_depth_label:
             trainer.main_without_backprop(depth,
@@ -135,7 +144,8 @@ def learning(demo_depth_label, explo_depth_label, trainer):
                                             demo=False)
             print('starting main training')
         ### Train with experienceReplay replay
-    trainer.main_xpreplay(nb_epoch=4, batch_size=1)
+
+        trainer.main_xpreplay(nb_epoch=1, batch_size=1)
     return trainer
 
 def viz_grap(trainer):
@@ -165,7 +175,6 @@ def grasping(nb_trial):
     explo_depth_label.append((depth_image, label_plt))
     return x_pred, y_pred
 
-
 def load():
     demo_depth_label, explo_depth_label = [], []
     demo_depth_label_file = [join('Experiences/Demonstration/depth_label/', f) for f in
@@ -183,12 +192,10 @@ def load():
 
     return demo_depth_label, explo_depth_label
 
-
 def proj_dist(p1, p2):
     d = p1[:2]-p2[:2]
     d = np.sqrt(np.dot(d, d))
     return d
-
 
 def test(trainer, dodemo, dograsp, dotrain, doreload, ):
     nb_demo, nb_trial = 0, 0
@@ -196,7 +203,7 @@ def test(trainer, dodemo, dograsp, dotrain, doreload, ):
     if doreload:
         demo_depth_label, explo_depth_label = load()
     if dodemo:
-        _, _ = demo(nb_demo)
+        demo(nb_demo)
         nb_demo += 1
         demo_depth_label, explo_depth_label = load()
     if dotrain:
@@ -210,7 +217,6 @@ def test(trainer, dodemo, dograsp, dotrain, doreload, ):
             nb_attempt += 1
             cont = input('Voulez vous continuer ? ')
         # grasping(nb_trial)
-
 
 def main_distance(trainer, dodemo, dograsp, dotrain, doreload):
     nb_demo, nb_trial = 0, 0
@@ -230,20 +236,21 @@ def main_distance(trainer, dodemo, dograsp, dotrain, doreload):
         nb_attempt = 0
         while cont == '1':
             x_pred, y_pred, _, _, depth = get_pred(camera, trainer)
-
             # Transfer the predicting grasping point into robot cartesian coordinates
             pred_point3D = camera.transform_3D(x_pred, y_pred, depth)
             # Transfer the true grasping point into robot cartesian coordinates
             ref_point = FT.detect_blue(camera)[0]
             ref_point3D = camera.transform_3D(*ref_point)
             d2 = proj_dist(ref_point3D, pred_point3D)
+            depth[depth == 0.] = np.max(depth)
             plt.imshow(depth)
             plt.scatter(ref_point[0], ref_point[1], color='red')
             plt.scatter(x_pred, y_pred, color='black')
             plt.show()
+            Zone = int(input('Prediction dans la zone ? oui:1, non:0'))
             with open("distance.csv", "a+") as f:
                 print("distance ref decision : {} ".format(d2))
-                line = ";".join(map(str, [d2, ref_point3D, pred_point3D, "\n"]))
+                line = ";".join(map(str, [d2, ref_point3D, pred_point3D, nb_attempt, Zone, "\n"]))
                 print(line)
                 f.write(line)
             print('Tentative numéro {}'.format(nb_attempt))
@@ -251,7 +258,6 @@ def main_distance(trainer, dodemo, dograsp, dotrain, doreload):
 
             cont = input('Voulez vous continuer ? ')
         # grasping(nb_trial)
-
 
 def validation(camera):
     nb_demo = 0 
@@ -336,20 +342,18 @@ if __name__=="__main__":
             # iiwa.iiwa.close()
 
     if test2:
-        load_trained_network = True
-        snapshot_file = 'clef_test_1'
+        load_trained_network = False
+        snapshot_file = 'Clef_Test6'
         camera.start_pipe()
         time.sleep(1)
         camera_param = [camera.intr.fx, camera.intr.fy, camera.intr.ppx, camera.intr.ppy, camera.depth_scale]
         get_precomputedFrame(camera)
-
         try:
             if load_trained_network:
                 trainer = Trainer(savetosnapshot=False, load=True, snapshot_file=snapshot_file)
             else:
                 trainer = Trainer(savetosnapshot=True, load=False, snapshot_file=snapshot_file)
                 main_distance(trainer, dodemo=False, dotrain=True, dograsp=False, doreload=True)
-
             main_distance(trainer, dograsp=True, dodemo=False, dotrain=False, doreload=False)
             # validation(camera)
             camera.stop_pipe()
@@ -361,6 +365,10 @@ if __name__=="__main__":
             # iiwa.iiwa.close()
             del exc_info
             pass
+
+        except KeyboardInterrupt:
+            print("fin programme")
+            camera.stop_pipe()
 
         except RuntimeError as e:
             exc_info = sys.exc_info()

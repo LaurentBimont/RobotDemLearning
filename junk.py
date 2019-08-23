@@ -277,7 +277,6 @@ def main_augmentation(self, dataset):
             self.optimizer.apply_gradients(zip(grad, self.myModel.trainable_variables),
                                            global_step=tf.train.get_or_create_global_step())
 
-
 def main(self, input):
     self.future_reward = 1
     with tf.GradientTape() as tape:
@@ -355,7 +354,6 @@ def histMasking(self, frame, hist):
     thresh = cv2.morphologyEx(thresh, cv2.MORPH_OPEN, kernel)
     thresh = cv2.merge((thresh, thresh, thresh))
     return cv2.bitwise_and(frame, thresh)
-
 
 # A mettre dans div
 def get_angle(self, fingers):

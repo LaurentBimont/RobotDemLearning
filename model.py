@@ -142,37 +142,47 @@ class GraspNetTest(BaseDeepModel):
         # Batch Normalization speed up convergence by reducing the internal covariance shift between batches
         # We can use a higher learning rate and it acts like a regulizer
         # https://arxiv.org/abs/1502.03167
-
-        self.bn0 = tf.keras.layers.BatchNormalization(name="grasp-b0")
+        # self.bn0 = tf.keras.layers.BatchNormalization(name="grasp-b0")
+        ### 1 ere couche ###
         self.conv0 = tf.keras.layers.Convolution2D(128, kernel_size=3, strides=1, activation=tf.nn.relu,
                                                    use_bias=True, padding='same', name="grasp-conv0", trainable=True)
+        self.drop0 = tf.keras.layers.Dropout(0.25)
 
+        ### 2 ieme couche ###
+        self.upconv0 = tf.keras.layers.UpSampling2D((2, 2))
+
+        ### 3 ieme couche ###
         self.bn1 = tf.keras.layers.BatchNormalization(name="grasp-b1")
-
-        self.drop1 = tf.keras.layers.Dropout(0.1)
         self.conv1 = tf.keras.layers.Convolution2D(256, kernel_size=3, strides=1, activation=tf.nn.relu,
                                                    use_bias=True, padding='same', name="grasp-conv1", trainable=True)
-        self.bn2 = tf.keras.layers.BatchNormalization(name="grasp-b2")
+        self.drop1 = tf.keras.layers.Dropout(0.25)
 
-        self.drop2 = tf.keras.layers.Dropout(0.1)
+        ### Classification couche ###
+        self.bn2 = tf.keras.layers.BatchNormalization(name="grasp-b2")
         self.conv2 = tf.keras.layers.Convolution2D(1, kernel_size=1, strides=1, activation=tf.nn.tanh,
                                                    use_bias=False, padding='same', name="grasp-conv2", trainable=True)
-        self.bn3 = tf.keras.layers.BatchNormalization(name="grasp-b2")
 
-        # self.tconv0 = tf.keras.layers.Conv2DTranspose(32, kernel_size=(2, 2), strides=3, activation=tf.nn.relu,
+        # self.bn3 = tf.keras.layers.BatchNormalization(name="grasp-b2")
+        # self.tconv0 = tf.keras.layers.Conv2DTranspose(1, kernel_size=(3, 3), strides=2, activation=tf.nn.tanh,
         #                                               use_bias=True, padding='same', name="tgrasp_conv0",
         #                                               trainable=True)
 
     def call(self, inputs, bufferize=False, step_id=-1):
         # print('Entrée du réseau seondaire', inputs.shape)
         # x = self.bn0(inputs)
+        ### 1 ere couche ###
         x = self.conv0(inputs)
-        # x = self.drop1(x)
+        x = self.drop0(x)
+        ### 2 ieme couche ###
+        x = self.upconv0(x)
+        ### 3 ieme couche ###
         x = self.bn1(x)
         x = self.conv1(x)
-        # x = self.drop2(x)
+        x = self.drop1(x)
+        ### Classification couche ###
         x = self.bn2(x)
         x = self.conv2(x)
+
         # x = self.bn3(x)
         # x = tf.multiply(3, x)
         # Rescaling between 0 and 1

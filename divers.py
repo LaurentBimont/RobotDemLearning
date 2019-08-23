@@ -28,7 +28,7 @@ def py_ang(v1, v2):
     sinang = np.linalg.norm(np.cross(v1, v2))
 
     det = v1[0] * v2[1] - v1[1] * v2[0]
-    if det<0:
+    if det < 0:
         return -np.arctan2(sinang, cosang)
     else:
         return np.arctan2(sinang, cosang)
@@ -47,13 +47,15 @@ def preprocess_depth_img(depth_image):
     # depth_image[depth_image > 0.55] = 0 Commenté le 16 juillet
     plt.imshow(depth_image)
     plt.show()
-    depth_image[depth_image > 0.45] = 0  # Rajouté le 16 juillet
+    depth_image[depth_image > 0.461] = 0
     depth_image[depth_image < 0.4] = 0
+    depth_image[depth_image != 0] = 1
+
     # depth_image[depth_image == 0] = np.mean(depth_image[depth_image != 0])  Commenté le 16 juillet
-    depth_image[depth_image == 0] = np.max(depth_image[depth_image != 0])
-    mini = np.min(depth_image.flatten())
+    # depth_image[depth_image == 0] = np.max(depth_image[depth_image != 0])
+    # mini = np.min(depth_image.flatten())
     # depth_image = np.ones(depth_image.shape) - (depth_image - mini) / (depth_image.max() - mini)
-    depth_image = np.ones(depth_image.shape) - (depth_image - 0.4) / (0.45 - 0.4)
+    # depth_image = np.ones(depth_image.shape) - (depth_image - 0.4) / (0.45 - 0.4)
     # depth_image[depth_image > 1] = 0
     depth_image = (depth_image * 255).astype('uint8')
     depth_image = np.asarray(np.dstack((depth_image, depth_image, depth_image)), dtype=np.uint8)
@@ -91,7 +93,6 @@ def postprocess_pred(out):
 
     (y_max, x_max) = np.unravel_index(out[:, :, 1].argmax(), out[:, :, 1].shape)
     y_max, x_max = y_max+10, x_max+10
-    ####### REMARQUE quand le max pixel est a moins de 50 des bords, ca buggue ######
     test_pca = out[max(y_max-zoom_pixel, 0):min(y_max+zoom_pixel, out.shape[0]), max(x_max-zoom_pixel, 0):min(x_max+zoom_pixel, out.shape[1]), 1]
     PointCloud = heatmap2pointcloud(test_pca)
     pca = PCA()
@@ -153,7 +154,7 @@ def get_ecartement_pince(vp, theta, center, camera):
 def get_angle(fingers):
     u1, v1, u2, v2 = fingers[0], fingers[1], fingers[2], fingers[3]
     angle = 180/np.pi * py_ang(np.array([u1-u2, v1-v2]), np.array([1, 0]))
-    return(angle - 90)
+    return angle - 90
 
 def get_ecartement(fingers):
     # return np.linalg.norm(self.cam.transform_3D(u1, v1)-self.cam.transform_3D(u2, v2))
@@ -175,6 +176,11 @@ def draw_rectangle(e, theta, x0, y0, lp):
 
     return np.array([[x1, y1], [x2, y2], [x4, y4], [x3, y3]], dtype=np.int)
 
+def evenisation(x):
+    if x%2 == 0:
+        return x
+    else:
+        return x+1
 
 def compute_labels(best_pix_ind, shape=(224,224,3), viz=False):
     '''Create the targeted Q-map

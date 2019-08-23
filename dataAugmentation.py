@@ -49,6 +49,7 @@ class OnlineAugmentation(object):
         :param batch: batch
         :return: None
         '''
+        print(batch[0].shape)
         self.general_batch['im'].append(batch[0])
         self.general_batch['label'].append(batch[1])
 
@@ -165,6 +166,83 @@ class OnlineAugmentation(object):
             return True
         return False
 
+    def rotate(self, im, label, mini, angle=0):
+        '''Rotate image
+        :param im: input image (numpy (224x224x3))
+        :param label: label (numpy (224x224x3))
+        :param angle: angle of rotation
+        :return: Flipping inputs in Tensor Format (rq : rotation[1] and rotation[2] have to be resized to the output format
+                 of the Network
+        '''
+        self.create_batch(im, label)
+        rotation = tf.contrib.image.rotate(self.batch, angles=angle)
+        # rotation_filled = self.replace_0(rotation[0], mini)
+        # rotation = tf.stack([rotation_filled, rotation[1]])
+        rotation = self.replace_0(rotation, mini)
+        # To handle
+        rotation_nump = rotation.numpy()
+        rotation_nump_angle = rotation_nump[1, :, :, 1]
+        rotation_nump_angle[np.where(rotation_nump_angle != 0)] += angle
+        rotation_nump[1, :, :, 1] = rotation_nump_angle
+        rotation = tf.convert_to_tensor(rotation_nump)
+
+        if self.assert_label(rotation[1]):
+            self.add_im(rotation)
+
+        # To be deleted
+        return rotation[0], rotation[1]
+
+    def crop(self, im, label, zooming=224):
+        '''Crop image
+        :param im: input image (numpy (224x224x3))
+        :param label: label (numpy (224x224x3))
+        :return: Cropping inputs in Tensor Format (rq : crop[1] and crop[2] have to be resized to the output format
+                 of the Network
+        '''
+        self.create_batch(im, label)
+        x = tf.random_crop(self.batch, size=[2, zooming, zooming, 3], seed=self.seed)
+        crop = tf.image.resize_images(x, size=self.original_size)
+        if self.assert_label(crop[1]):
+            self.add_im(crop)
+
+        # To be deleted
+        return crop[0], crop[1]
+
+    def translate(self, im, label, mini, pad_top=0, pad_left=0, pad_bottom=0, pad_right=0):
+        '''Crop image
+        :param im: input image (numpy (224x224x3))
+        :param label: label (numpy (224x224x3))
+        :param pad_top: translation to the bottom (pixels)
+        :param pad_left: translation to the right (pixels)
+        :param pad_bottom: translation to the bottom (pixels)
+
+        :return: Translated inputs in Tensor Format (rq : translate[1] and translate[2] have to be resized to the output format
+                 of the Network
+        '''
+        self.create_batch(im, label)
+        height, width = 224, 224
+        x = tf.image.pad_to_bounding_box(self.batch, pad_top, pad_left, height + pad_bottom + pad_top,
+                                         width + pad_right + pad_left)
+        # pad_to_bounding_box(image, offset_height, offset_width, target_height, target_width
+        translate = tf.image.crop_to_bounding_box(x, pad_bottom, pad_right, height, width)
+        translate = self.replace_0(translate, mini)
+        if self.assert_label(translate[1]):
+            self.add_im(translate)
+        return translate[0], translate[1]
+
+    def assert_label(self, label):
+        '''Assert if a label image still contain the demonstrating grasping point
+        :param label label: label(numpy (224x224x3))
+
+        :return: True if a valid grasping point is still in the image
+                 False otherwise
+        '''
+        label_temp = label.numpy()[:, :, 0]
+        label_temp[label_temp != 0] = 1
+        if np.sum(label_temp) > 30:
+            return True
+        return False
+
     def generate_batch(self, im, label, mini, augmentation_factor=2, viz=False):
         '''Generate new images and label from one image/demonstration
         :param im: input image (numpy (224x224x3))
@@ -176,34 +254,33 @@ class OnlineAugmentation(object):
         print('taille image diametre ', im.shape)
         print('Facteur da ', augmentation_factor)
         for i in range(augmentation_factor):
-            ima, lab = self.crop(im, label, zooming=np.random.randint(150, 223))
-            if self.assert_label(lab):
-                for j in range(augmentation_factor):
-                    ima, lab = self.rotate(ima, lab, mini, angle=np.random.rand() * 0.785)
+                ima, lab = self.rotate(ima, lab, mini, angle=np.random.rand() * 0.785)
 
-                    if self.assert_label(lab):
-                        for k in range(augmentation_factor):
-                            ima, lab = self.translate(ima, lab, mini,
-                                                      pad_top=np.random.randint(0, 50),
-                                                      pad_left=np.random.randint(0, 50),
-                                                      pad_bottom=np.random.randint(0, 50),
-                                                      pad_right=np.random.randint(0, 50))
-                            if viz:
-                                if self.assert_label(lab):
-
-                                    if h < 10 and k == 2:
-                                        plt.figure(1)
-                                        plt.subplot(3, 3, h)
-                                        plt.imshow(ima.numpy())
-                                        plt.figure(2)
-                                        plt.subplot(3, 3, h)
-                                        plt.imshow(lab.numpy())
-                                        h += 1
+                if self.assert_label(lab):
+                    for k in range(2*augmentation_factor):
+                        ima, lab = self.translate(ima, lab, mini,
+                                                  pad_top=np.random.randint(0, 50),
+                                                  pad_left=np.random.randint(0, 50),
+                                                  pad_bottom=np.random.randint(0, 50),
+                                                  pad_right=np.random.randint(0, 50))
+                        if viz:
                             if self.assert_label(lab):
-                                self.flip(ima, lab)
+
+                                if h < 10 and k == 2:
+                                    plt.figure(1)
+                                    plt.subplot(3, 3, h)
+                                    plt.imshow(ima.numpy())
+                                    plt.figure(2)
+                                    plt.subplot(3, 3, h)
+                                    plt.imshow(lab.numpy())
+                                    h += 1
+                        if self.assert_label(lab):
+                            self.flip(ima, lab)
         if viz:
             plt.show()
         return self.general_batch
+
+
 
 if __name__=="__main__":
     tf.enable_eager_execution()
@@ -237,6 +314,7 @@ if __name__=="__main__":
     viz = True
     if viz:
         # plt.subplot(1, 2, 1)
+
         # plt.imshow(crop.numpy())
         # plt.subplot(1, 2, 2)
         # plt.imshow(label_crop.numpy().astype(np.int))

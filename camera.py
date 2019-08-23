@@ -3,7 +3,7 @@ import pyrealsense2 as rs
 import matplotlib.pyplot as plt
 import time
 # Rq : realsense display images in rgb
-
+import json
 
 class RealCamera:
     def __init__(self):
@@ -58,6 +58,10 @@ class RealCamera:
                 depth_sensor = self.profile.get_device().first_depth_sensor()
                 self.depth_scale = depth_sensor.get_depth_scale()
 
+                # Création des filtres
+                self.hole_filling = rs.hole_filling_filter()
+                self.temporal_filter = rs.temporal_filter()
+                self.spatial_filter = rs.spatial_filter()
                 # Get Intrinsic parameters
                 self.get_intrinsic()
                 print('Caméra Ouverte')
@@ -69,8 +73,11 @@ class RealCamera:
             self.pipelineStarted = False
 
     def show(self):
+        temp_depth = self.depth_image
+        temp_depth[temp_depth==0.] = np.max(temp_depth)
+        print(np.min(temp_depth), np.mean(temp_depth))
         plt.subplot(1, 3, 1)
-        plt.imshow(self.depth_image)
+        plt.imshow(temp_depth)
         plt.subplot(1, 3, 2)
         plt.imshow(self.color_image)
         plt.subplot(1, 3, 3)
@@ -86,10 +93,17 @@ class RealCamera:
         aligned_frames = self.align.process(self.frame)
 
         # Get aligned frames
-        aligned_depth_frame = aligned_frames.get_depth_frame()  # aligned_depth_frame is a 640x480 depth image
+        frames = []
+        for x in range(10):
+            temp_filtered = self.temporal_filter.process(aligned_frames.get_depth_frame())
+        # aligned_depth_frame = aligned_frames.get_depth_frame()  # aligned_depth_frame is a 640x480 depth image
         color_frame = aligned_frames.get_color_frame()
 
-        self.depth_image = np.asanyarray(aligned_depth_frame.get_data())*self.depth_scale
+        # Processing
+        self.depth_image = self.spatial_filter.process(temp_filtered)
+        self.depth_image = self.hole_filling.process(self.depth_image)
+
+        self.depth_image = np.asanyarray(self.depth_image.get_data())*self.depth_scale
         self.depth_image[self.depth_image > 6] = 0.
         self.depth_mask = np.copy(self.depth_image)
         self.depth_mask[self.depth_mask > 0.] = 1
@@ -101,6 +115,9 @@ class RealCamera:
         self.mask_color[:, :, 0] *= self.depth_mask
         self.mask_color[:, :, 1] *= self.depth_mask
         self.mask_color[:, :, 2] *= self.depth_mask
+
+        # Mettre ces images au carré
+        self.depth_image, self.color_image = self.depth_image[:, 160:], self.color_image[:, 160:]
 
         return self.depth_image, self.color_image
 
@@ -165,6 +182,12 @@ if __name__=='__main__':
     Cam = RealCamera()
     Cam.start_pipe(usb3=True)
     Cam.get_intrinsic()
-    Cam.get_frame()
+    while True:
+        Cam.get_frame()
+        Cam.show()
+        stop = input('Stop ?')
+        if stop=='0':
+            break
+
     Cam.stop_pipe()
-    Cam.show()
+
