@@ -30,27 +30,37 @@ def get_precomputedFrame(camera):
     plt.show()
     np.save('./Experiences/Demonstration/tournevis/tournevis1.npy', depth_image)
 
-def get_pred(camera, trainer):
-    depth_image, _ = camera.get_frame()
-    depth = np.copy(depth_image)
+# def get_pred(camera, trainer):
+#     depth_image, _ = camera.get_frame()
+#     depth = np.copy(depth_image)
 
+def get_pred(trainer, depth):
+    depth_image = np.copy(depth)
     init_shape = depth_image.shape
     depth_image = div.preprocess_depth_img(depth_image)
     depth_image = resize(depth_image, (224, 224, 3), anti_aliasing=True)
     depth_image = (depth_image * 255).astype('uint8')
 
     depth_image = depth_image.reshape((1, 224, 224, 3))
-
+    # batch_img, batch_lab = trainer.exp_rpl.replay(1)
     copy_depth = depth_image.copy()
+
+    ##### To compare images between training and testing
+    # plt.subplot(1, 2, 1)
+    # plt.imshow(batch_img[0])
+    # plt.subplot(1, 2, 2)
+    # plt.imshow(depth_image[0])
+    # plt.show()
+    ######
+
     output_prob = trainer.forward(depth_image)
     out_numpy = output_prob[0].numpy()
-    
     out = trainer.prediction_viz(out_numpy, depth_image)
 
     out = out.reshape((224, 224, 3))
     out = resize(out, init_shape)
 
-    viz = True
+    viz = False
     x_pred, y_pred, angle_pred, e_pred, pca_zoom = div.postprocess_pred(out)
 
     if viz:
@@ -60,21 +70,17 @@ def get_pred(camera, trainer):
         plt.imshow(out)
         plt.plot([rect[0][0], rect[1][0]], [rect[0][1], rect[1][1]], linewidth=2, color='yellow')
         plt.plot([rect[2][0], rect[3][0]], [rect[2][1], rect[3][1]], linewidth=2, color='yellow')
-        plt.subplot(2, 2, 2)
-        plt.imshow(pca_zoom)
-        #plt.imshow(cv2.cvtColor(_, cv2.COLOR_BGR2RGB))
-        # plt.savefig('pred{}.png'.format(i), dpi=600)
-        # if execute=='1':
-        plt.subplot(2, 2, 3)
-        cop_copy_depth = copy_depth[0, :, :, :]
-        cop_copy_depth[cop_copy_depth==0.] = np.max(cop_copy_depth)
-        plt.imshow(cop_copy_depth)
+
+        # plt.subplot(1, 2, 2)
+        # cop_copy_depth = copy_depth[0, :, :, :]
+        # cop_copy_depth[cop_copy_depth==0.] = np.max(cop_copy_depth)
+        # plt.imshow(cop_copy_depth)
 
         # plt.scatter(int(x_pred), int(y_pred))
-        plt.subplot(2, 2, 3)
+        plt.subplot(1, 2, 2)
         plt.imshow(out[:, :, 1])
         plt.show()
-    return x_pred, y_pred, angle_pred, e_pred, depth
+    return x_pred, y_pred, angle_pred, e_pred, depth, out
 
 def demo(nb_demo):
     xp_param = []
@@ -128,14 +134,14 @@ def learning(demo_depth_label, explo_depth_label, trainer):
 
         ### Create experience replay ranking
         for depth, label in demo_depth_label:
-            plt.subplot(1, 2, 1)
-            plt.imshow(depth)
-            plt.subplot(1, 2, 2)
-            plt.imshow(label)
-            plt.show()
+            # plt.subplot(1, 2, 1)
+            # plt.imshow(depth)
+            # plt.subplot(1, 2, 2)
+            # plt.imshow(label)
+            # plt.show()
             trainer.main_without_backprop(depth,
                                             label,
-                                            augmentation_factor=6,
+                                            augmentation_factor=4,
                                             demo=True)
         for depth, label in explo_depth_label:
             trainer.main_without_backprop(depth,
@@ -181,6 +187,7 @@ def load():
                              listdir('Experiences/Demonstration/depth_label/') if
                              isfile(join('Experiences/Demonstration/depth_label/', f))]
     for f in demo_depth_label_file:
+        print('Loading : ', f)
         demo_depth_label.append(np.load(f))
 
     explo_depth_label_file = [join('Experiences/Exploration/depth_label/', f) for f in
@@ -188,6 +195,7 @@ def load():
                               isfile(join('Experiences/Exploration/depth_label/', f))]
 
     for f in explo_depth_label_file:
+        print('Loading : ', f)
         explo_depth_label.append(np.load(f))
 
     return demo_depth_label, explo_depth_label
@@ -218,8 +226,33 @@ def test(trainer, dodemo, dograsp, dotrain, doreload, ):
             cont = input('Voulez vous continuer ? ')
         # grasping(nb_trial)
 
+def main_test(trainer, dotrain=False, dograsp=False):
+
+    if dotrain:
+        demo_depth_label, explo_depth_label = load()
+        trainer = learning(demo_depth_label, explo_depth_label, trainer)
+
+    # Loading
+    distance_array = []
+    if dograsp:
+        for i in range(36):
+            depth = np.load('Automated_test/Test_{}.npy'.format(i))
+            good_pos = np.load('Automated_test/Good_Point{}.npy'.format(i))
+            x_pred, y_pred, _, _, depth, out = get_pred(trainer, depth)
+            distance = np.sqrt((good_pos[0]-x_pred)**2 + (good_pos[1]-y_pred)**2)
+            distance_array.append(distance)
+            print('La distance est de : ', distance)
+            plt.subplot(1, 2, 1)
+            plt.imshow(depth)
+            plt.scatter(good_pos[0], good_pos[1], color='red')
+            plt.scatter(x_pred, y_pred, color='black')
+            plt.subplot(1, 2, 2)
+            plt.imshow(out[:, :, 1])
+            plt.show()
+    return distance_array
+
 def main_distance(trainer, dodemo, dograsp, dotrain, doreload):
-    nb_demo, nb_trial = 0, 0
+    nb_demo, nb_trial = 2, 0
     demo_depth_label = []
     if doreload:
         demo_depth_label, explo_depth_label = load()
@@ -235,7 +268,7 @@ def main_distance(trainer, dodemo, dograsp, dotrain, doreload):
         cont = '1'
         nb_attempt = 0
         while cont == '1':
-            x_pred, y_pred, _, _, depth = get_pred(camera, trainer)
+            x_pred, y_pred, _, _, depth, _ = get_pred(camera, trainer)
             # Transfer the predicting grasping point into robot cartesian coordinates
             pred_point3D = camera.transform_3D(x_pred, y_pred, depth)
             # Transfer the true grasping point into robot cartesian coordinates
@@ -247,6 +280,9 @@ def main_distance(trainer, dodemo, dograsp, dotrain, doreload):
             plt.scatter(ref_point[0], ref_point[1], color='red')
             plt.scatter(x_pred, y_pred, color='black')
             plt.show()
+            np.save('Automated_test/Test_{}.npy'.format(nb_attempt), depth)
+            np.save('Automated_test/Good_Point{}.npy'.format(nb_attempt), [ref_point[0], ref_point[1]])
+
             Zone = int(input('Prediction dans la zone ? oui:1, non:0'))
             with open("distance.csv", "a+") as f:
                 print("distance ref decision : {} ".format(d2))
@@ -255,7 +291,6 @@ def main_distance(trainer, dodemo, dograsp, dotrain, doreload):
                 f.write(line)
             print('Tentative numéro {}'.format(nb_attempt))
             nb_attempt += 1
-
             cont = input('Voulez vous continuer ? ')
         # grasping(nb_trial)
 
@@ -304,9 +339,41 @@ if __name__=="__main__":
     # iiwa.home()
     ### Quel test va-t-on jouer ? ###
     testgeneral = False
-    test2 = True
+    test2 = False
+    automated_test = True
 
-    ### Test Général ###
+#### Test Automatisé
+    if automated_test:
+        load_trained_network = True
+        snapshot_file = 'Clef_Test12'
+        try:
+            if load_trained_network:
+                trainer = Trainer(savetosnapshot=False, load=True, snapshot_file=snapshot_file)
+            else:
+                trainer = Trainer(savetosnapshot=True, load=False, snapshot_file=snapshot_file)
+                main_test(trainer, dotrain=True, dograsp=False)
+            distance_array = main_test(trainer, dograsp=True, dotrain=False)
+            print('Nombre de réussite : {}/{} '.format(np.sum(np.array(distance_array) < 60), len(distance_array)))
+
+        except Exception as e:
+            exc_info = sys.exc_info()
+            traceback.print_exception(*exc_info)
+            camera.stop_pipe()
+            # iiwa.iiwa.close()
+            del exc_info
+            pass
+
+        except KeyboardInterrupt:
+            print("fin programme")
+            camera.stop_pipe()
+
+        except RuntimeError as e:
+            exc_info = sys.exc_info()
+            traceback.print_exception(*exc_info)
+            camera.stop_pipe()
+            # iiwa.iiwa.close()
+
+### Test Général ###
     if testgeneral:
         trainer = Trainer(savetosnapshot=False, load=False, snapshot_file='ampouletanh')
         camera.start_pipe()
@@ -375,4 +442,5 @@ if __name__=="__main__":
             traceback.print_exception(*exc_info)
             camera.stop_pipe()
             # iiwa.iiwa.close()
+
 

@@ -102,10 +102,10 @@ class Trainer(object):
             # print('Les poids : ', 1/(np.sum(l_numpy > 0)+1), 1/(np.sum(l_numpy < 0)+1), 1/(np.sum(l_numpy == 0)+1))
 
             lossL2 = tf.add_n([tf.nn.l2_loss(v) for v in self.vars])
-            self.loss_value = self.loss(l, output, weight) + 0.0000005 * lossL2
-
-            print('Contribution des loss : Huber ({}) et L2 reg ({})'.format(self.loss(l, output, weight)/self.loss_value,
-                  0.0000005*lossL2/self.loss_value))
+            self.loss_value = self.loss(l, output, weight) + 0.000001 * lossL2
+            # print('Contribution pour chaque classe \n 1 {} \n -1 {} \n 0 {}'.format(10/(np.sum(l_numpy > 0)+1), 10/(np.sum(l_numpy < 0)+1), 1/(np.sum(l_numpy == 0)+1)))
+            # print('Contribution des loss : Huber ({}) et L2 reg ({})'.format(self.loss(l, output, weight)/self.loss_value,
+            #       0.000001*lossL2/self.loss_value))
 
         new_lab = label[0].numpy()
         new_lab = new_lab.reshape((1, *new_lab.shape))
@@ -192,8 +192,8 @@ class Trainer(object):
             plt.imshow(self.image)
             plt.subplot(1, 2, 2)
             label_viz = np.reshape(label, (224, 224, 3))
-            plt.imshow(label)
-            plt.show()
+            # plt.imshow(label)
+            # plt.show()
         return label
 
     def reduced_label(self, label):

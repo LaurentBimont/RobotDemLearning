@@ -22,7 +22,7 @@ class DensenetFeatModel(tf.keras.Model):
         self.model = tf.keras.Model(inputs=baseModel.input, outputs=baseModel.get_layer(
             "conv5_block16_concat").output)
         for layer in self.model.layers:
-            layer.trainable = True
+            layer.trainable = False
 
     def call(self, inputs):
         # inputs = tf.transpose(inputs,(0,3,2,1))
@@ -143,29 +143,24 @@ class GraspNetTest(BaseDeepModel):
         # We can use a higher learning rate and it acts like a regulizer
         # https://arxiv.org/abs/1502.03167
         # self.bn0 = tf.keras.layers.BatchNormalization(name="grasp-b0")
+        dropout_rate = 0.4
         ### 1 ere couche ###
         self.conv0 = tf.keras.layers.Convolution2D(128, kernel_size=3, strides=1, activation=tf.nn.relu,
                                                    use_bias=True, padding='same', name="grasp-conv0", trainable=True)
-        self.drop0 = tf.keras.layers.Dropout(0.25)
-
+        self.drop0 = tf.keras.layers.Dropout(dropout_rate)
         ### 2 ieme couche ###
         self.upconv0 = tf.keras.layers.UpSampling2D((2, 2))
-
         ### 3 ieme couche ###
         self.bn1 = tf.keras.layers.BatchNormalization(name="grasp-b1")
         self.conv1 = tf.keras.layers.Convolution2D(256, kernel_size=3, strides=1, activation=tf.nn.relu,
                                                    use_bias=True, padding='same', name="grasp-conv1", trainable=True)
-        self.drop1 = tf.keras.layers.Dropout(0.25)
+        self.drop1 = tf.keras.layers.Dropout(dropout_rate)
 
         ### Classification couche ###
         self.bn2 = tf.keras.layers.BatchNormalization(name="grasp-b2")
         self.conv2 = tf.keras.layers.Convolution2D(1, kernel_size=1, strides=1, activation=tf.nn.tanh,
                                                    use_bias=False, padding='same', name="grasp-conv2", trainable=True)
-
         # self.bn3 = tf.keras.layers.BatchNormalization(name="grasp-b2")
-        # self.tconv0 = tf.keras.layers.Conv2DTranspose(1, kernel_size=(3, 3), strides=2, activation=tf.nn.tanh,
-        #                                               use_bias=True, padding='same', name="tgrasp_conv0",
-        #                                               trainable=True)
 
     def call(self, inputs, bufferize=False, step_id=-1):
         # print('Entrée du réseau seondaire', inputs.shape)

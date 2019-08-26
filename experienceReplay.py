@@ -18,7 +18,7 @@ class ExperienceReplay:
         self.replay_buffer.append(data)
 
     def generate_ranking(self):
-        print(len(self.replay_buffer))
+        print('Taille du Buffer : ', len(self.replay_buffer))
         if len(self.replay_buffer) > 2:
             print("experience replay {} experience are stored in buffer ".format(len(self.replay_buffer)))
             self.data = pd.DataFrame(self.replay_buffer, columns=self.header)

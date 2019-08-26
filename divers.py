@@ -7,8 +7,6 @@ import cv2
 
 def heatmap2pointcloud(img):
     # Rescale between 0 and 1
-
-    print('Ce qui rentre ')
     # img = (img - np.min(img))/(np.max(img)-np.min(img))
     PointCloudList = []
     for index, x in np.ndenumerate(img):
@@ -45,8 +43,8 @@ def angle2robotangle(angle):
 
 def preprocess_depth_img(depth_image):
     # depth_image[depth_image > 0.55] = 0 Commenté le 16 juillet
-    plt.imshow(depth_image)
-    plt.show()
+    # plt.imshow(depth_image)
+    # plt.show()
     depth_image[depth_image > 0.461] = 0
     depth_image[depth_image < 0.4] = 0
     depth_image[depth_image != 0] = 1
