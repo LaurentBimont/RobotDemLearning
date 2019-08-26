@@ -88,25 +88,29 @@ def postprocess_img( imgs, list_angles):
 def postprocess_pred(out):
     out[out < 0] = 0
     zoom_pixel = 50
-
+    out[:, :, 1] = out[:, :, 1]*(out[:, :, 0] != 0).astype(np.int)
     (y_max, x_max) = np.unravel_index(out[:, :, 1].argmax(), out[:, :, 1].shape)
-    y_max, x_max = y_max+10, x_max+10
-    test_pca = out[max(y_max-zoom_pixel, 0):min(y_max+zoom_pixel, out.shape[0]), max(x_max-zoom_pixel, 0):min(x_max+zoom_pixel, out.shape[1]), 1]
-    PointCloud = heatmap2pointcloud(test_pca)
+    y_max, x_max = y_max, x_max
+    plt.subplot(1, 2, 1)
+    plt.imshow(out[:, :, 0])
+    test_pca = out[max(y_max-zoom_pixel, 0):min(y_max+zoom_pixel, out.shape[0]), max(x_max-zoom_pixel, 0):min(x_max+zoom_pixel, out.shape[1]), 0]
+    plt.subplot(1, 2, 2)
+    plt.imshow(test_pca)
+    plt.show()
+    np.save('test_pca.npy', test_pca)
+    # PointCloud = heatmap2pointcloud(test_pca)
     pca = PCA()
-    pca.fit(PointCloud)
+    pca.fit(np.argwhere(test_pca != 0))
     vectors = pca.components_
     sing_val = pca.singular_values_/np.linalg.norm(pca.singular_values_)
-    print(vectors, sing_val)
     vectors[0] *= sing_val[0]
     vectors[1] *= sing_val[1]
     np.linalg.norm(pca.singular_values_)
     origin = [zoom_pixel], [zoom_pixel]
     e = 30
-    theta = py_ang([1, 0], vectors[0])*180/np.pi
+    theta = py_ang([1, 0], vectors[1])*180/np.pi
     # e_mm = get_ecartement_pince(sing_val[1], theta, (y_max, x_max), camera)
     return x_max, y_max, theta, e, test_pca
-
 
 def get_ecartement_pince(vp, theta, center, camera):
     sigma = 2*np.sqrt(vp)

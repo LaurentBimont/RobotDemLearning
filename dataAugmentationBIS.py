@@ -44,13 +44,38 @@ class OnlineAugmentation(object):
                 noisy_square_im = add_noise(np.copy(square_im))
             else:
                 noisy_square_im = np.copy(square_im)
+
+            print('Angle ajoutée est : ', angle)
+            print('Angle initial est : ', np.max(square_lab[:, :, 1]))
+            plt.subplot(2, 4, 5)
+            plt.imshow(square_lab)
+
             rot_plain_img, rot_plain_label = rotation_insert(noisy_square_im, square_lab, angle, xc, yc, x_lim, y_lim)
+
             if bool_add_noise:
                 rot_plain_img = add_noise(rot_plain_img)
+
+            rot_plain_label = change_ang_value(rot_plain_label, angle)
             self.add_im(rot_plain_img, rot_plain_label)
-            self.add_im(np.flip(rot_plain_img, 0), np.flip(rot_plain_label, 0))
-            self.add_im(np.flip(rot_plain_img, 1), np.flip(rot_plain_label, 1))
-            self.add_im(np.flip(np.flip(rot_plain_img, 1), 0), np.flip(np.flip(rot_plain_label, 1), 0))
+
+            plt.subplot(2, 4, 1)
+            plt.imshow(rot_plain_label)
+
+            up_down_flip_label = flip_ang_value(np.copy(rot_plain_label), 1)
+            self.add_im(np.flip(rot_plain_img, 0), np.flip(up_down_flip_label, 0))
+            plt.subplot(2, 4, 2)
+            plt.imshow(np.flip(up_down_flip_label, 0))
+
+            left_right_flip_label = flip_ang_value(np.copy(rot_plain_label), 2)
+            self.add_im(np.flip(rot_plain_img, 1), np.flip(left_right_flip_label, 1))
+            plt.subplot(2, 4, 3)
+            plt.imshow(np.flip(left_right_flip_label, 1))
+
+            both_flip_label = flip_ang_value(np.copy(rot_plain_label), 3)
+            self.add_im(np.flip(np.flip(rot_plain_img, 1), 0), np.flip(np.flip(both_flip_label, 1), 0))
+            plt.subplot(2, 4, 4)
+            plt.imshow(np.flip(np.flip(both_flip_label, 1), 0))
+            plt.show()
 
             # PETIT TRAVAIL A FAIRE SI ON VEUT RAJOUTER L'ANGLE
             if viz:
@@ -64,8 +89,6 @@ class OnlineAugmentation(object):
                 plt.subplot(2, 2, 4)
                 plt.imshow(np.flip(np.flip(rot_plain_label, 1), 0))
                 plt.show()
-
-
         return self.general_batch
 
 def add_noise(im):
@@ -100,9 +123,12 @@ def create_sub_square(im, label, x, y, w, h):
     zoom_im, zoom_lab = im[y:y+h, x:x+w, :], label[y:y+h, x:x+w, :]
     # Mise dans un carré permettant des rotations sans aucun troncage sqrt(2)*c
     great_length = div.evenisation(int(np.sqrt(2)*np.max(zoom_im.shape)) + 1)
-    square_im, square_lab = np.zeros((great_length, great_length, 3)), np.zeros((great_length, great_length, 3))
+    square_im, square_lab = np.zeros((great_length, great_length, 3)), np.zeros((great_length, great_length, 3), dtype=np.int)
     square_im[great_length//2-h//2:great_length//2+h//2, great_length//2-w//2:great_length//2+w//2, :] = zoom_im[:, :, :]
     square_lab[great_length//2-h//2:great_length//2+h//2, great_length//2-w//2:great_length//2+w//2, :] = zoom_lab[:, :, :]
+    print('ici')
+    plt.imshow(square_lab)
+    plt.show()
     viz = False
     if viz:
         plt.subplot(1, 2, 1)
@@ -134,22 +160,53 @@ def rotation_insert(img, label, angle, xc, yc, x_lim, y_lim):
     label_pos = scipy_image.rotate(label_pos, angle, reshape=False)
     label_neg = scipy_image.rotate(label_neg, angle, reshape=False)
 
-    rot_img, rot_label = scipy_image.rotate(img.astype(np.uint8), angle, reshape=False), scipy_image.rotate(label, angle, reshape=False)
-
+    rot_img, rot_label = scipy_image.rotate(img.astype(np.uint8), angle, reshape=False), scipy_image.rotate(label, angle,
+                                                                                                            reshape=False)
     rot_label[:, :, 0] = np.zeros(rot_label[:, :, 0].shape)
     label_neg, label_pos = label_neg.astype(np.int32), label_pos.astype(np.int32)
     label_pos[label_pos > 0] = 1
     label_pos[label_pos < 0] = 1
-    label_neg[label_neg != 0] = -1
+    label_neg[label_neg != 0] = 255
 
     rot_label = rot_label.astype(np.int32)
     rot_label[:, :, 0] = label_pos + label_neg
-
     rot_img, rot_label = insert_demo(rot_img, xc, yc, x_lim, y_lim), insert_demo(rot_label, xc, yc, x_lim, y_lim)
     # rot_img[rot_img < 0.5] = 0
     # rot_label[rot_label < 0.5] = 0
 
     return rot_img.astype(np.int32), rot_label.astype(np.int32)
+
+def change_ang_value(label, ang):
+
+    square_lab_ang = label[:, :, 1]
+    print('Ancien Angle', np.max(label[:, :, 1])%180)
+
+    square_lab_ang[np.where(square_lab_ang != 0)] += ang
+    label[:, :, 1] = square_lab_ang%180
+    print('Nouvel Angle', np.max(label[:, :, 1]))
+    return label
+
+def flip_ang_value(label, thetype):
+    '''
+    :param label:
+    :param thetype: 1 : up and down
+                    2 : left to right
+                    3 : both
+    '''
+    if thetype == 1:
+        # plt.subplot(1, 2, 1)
+        # plt.imshow(label[:, :, 1])
+        label[:, :, 1] = -label[:, :, 1]
+
+    if thetype == 2:
+        label[:, :, 1] = 180 - label[:, :, 1]
+    if thetype == 3:
+        label[:, :, 1] = 180 + label[:, :, 1]
+    label[:, :, 1] = label[:, :, 1] % 180
+    # plt.subplot(1, 2, 2)
+    # plt.imshow(label[:, :, 1])
+    # plt.show()
+    return label
 
 if __name__=="__main__":
     data = np.load('Experiences/Demonstration/depth_label/depth_parameters_demo0.npy')
@@ -160,33 +217,24 @@ if __name__=="__main__":
     x, y, w, h = detect_tool(img[:, :, 0])
     # Isolation de la zone comprenant la partie intéressante
     square_im, square_lab = create_sub_square(img, label, x, y, w, h)
-
+    ang = 61
+    square_lab_ang = change_ang_value(square_lab, ang)
     x_lim, y_lim, _ = img.shape
     xc, yc = 200, 200
 
-    rot_plain_img, rot_plain_label = rotation_insert(square_im, square_lab, 565, xc, yc, x_lim, y_lim)
+    rot_plain_img, rot_plain_label = rotation_insert(square_im, square_lab, ang, xc, yc, x_lim, y_lim)
+
     # plt.subplot(1, 2, 1)
     # plt.imshow(rot_plain_img)
     # plt.subplot(1, 2, 2)
     # plt.imshow(rot_plain_label)
     # plt.show()
 
-    DA = OnlineAugmentation()
-    DA.generate_batch(img, label, augmentation_factor=4)
 
-    # print(-1)
-    # hey = Trainer()
-    # print(0)
-    # hey.forward(im)
-    # label = hey.compute_labels(1.9, best_idx)
-    # print(2)
-    # OA = OnlineAugmentation()
-    # print(3)
-    # OA.create_batch(im, label)
-    # print(4)
-    # flip, label_flip,_flip = OA.crop(im, label, zooming=200)
-    # print(5)
-    # OA.generate_batch(im, label)
+
+    DA = OnlineAugmentation()
+    DA.generate_batch(img, label, 0, augmentation_factor=4)
+
     viz = False
     if viz:
         # plt.subplot(1, 2, 1)

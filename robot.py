@@ -122,18 +122,16 @@ class Robot:
             else:
                 u, v = self.manual_click(color)
         second_min = div.second_min(depth_img.flatten())
-        depth_img[depth_img==0.] = second_min
+        depth_img[depth_img == 0.] = second_min
         camera = self.camera.transform_3D(u, v, depth_img, param=camera_param)
         camera = camera.reshape(3, 1)
         print('camera size : {}'.format(camera.shape), camera, np.transpose(camera).shape)
         if cartpos is None:
             cartpos = self.getCart()
-            print(cartpos)
         Base_main = self.camera2main(np.transpose(camera), self.Rmain_camera, self.Tmain_camera)
         R, T = self.get_rotation_translation(cartpos)
         Base_robot = self.fromAtoB(Base_main, np.transpose(R), -T, changeT=False)
         Base_robot = Base_robot.reshape(3)
-        print(Base_robot)
         return Base_robot
 
     def checkTCPJoint(self):
@@ -185,18 +183,22 @@ class Robot:
         pos[2] = max(pos[2]-60, self.z_min)
         pos[0] += 14
         pos[1] -= 31.7
+        print('L angle dans le repère robot : {} \nAngle dans le repère base{}'.format(angle, ang))
         grasp_above = [pos[0], pos[1], pos[2]+100., angle, 0, np.pi]
+        print('Grasping à ', grasp_above)
         self.iiwa.movePTPLineEEF(grasp_above, 4*speed, orientationVel=0.5)
         self.grip.openGripper()
         grasp = [pos[0], pos[1], pos[2], angle, 0, np.pi]
         self.iiwa.movePTPLineEEF(grasp, speed, orientationVel=0.1)
         self.grip.closeGripper()
-        time.sleep(2)
+        time.sleep(1)
         print('Objet Détectée', self.grip.isObjectDetected())
-        if self.grip.isObjectDetected():
-            jpos = self.iiwa.getJointsPos()
-            jpos[6] = (jpos[6] + 0.4) % (np.pi/2)
-            self.iiwa.movePTPJointSpace(jpos,0.1) 
+        ### Fait une rotation de l'objet ###
+        # if self.grip.isObjectDetected():
+        #     jpos = self.iiwa.getJointsPos()
+        #     jpos[6] = (jpos[6] + 0.4) % (np.pi/2)
+        #     self.iiwa.movePTPJointSpace(jpos,0.1)
+
         self.grip.openGripper()
         self.home()
         return self.grip.isObjectDetected()
@@ -208,7 +210,7 @@ def onclick(event):
 
 if __name__=="__main__":
     rob = Robot()
-    rob.home()
+    # rob.home()
     print(rob.getCart(), rob.iiwa.getJointsPos())
 
     try:

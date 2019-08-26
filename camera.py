@@ -127,9 +127,9 @@ class RealCamera:
         :return: return the view in 3D space
         '''
         if image is None:
-            d = self.depth_image[v, u]
+            d = self.depth_image[u, v]
         else:
-            d = image[v, u]
+            d = image[u, v]
         if param is None:
             depth_scale = self.depth_scale
             fx, fy, Cx, Cy = self.intr.fx, self.intr.fy, self.intr.ppx, self.intr.ppy

@@ -20,22 +20,24 @@ from camera import RealCamera
 #########Fonction pour la lisibilité #########
 
 ## A virer ##
-def get_precomputedFrame(camera):
-    depth_image, _ = camera.get_frame()
-    plt.subplot(1, 2, 1)
-    plt.imshow(depth_image)
-    depth_image = div.preprocess_depth_img(depth_image)
-    plt.subplot(1, 2, 2)
-    plt.imshow(depth_image)
-    plt.show()
-    np.save('./Experiences/Demonstration/tournevis/tournevis1.npy', depth_image)
-
-# def get_pred(camera, trainer):
+# def get_precomputedFrame(camera):
 #     depth_image, _ = camera.get_frame()
-#     depth = np.copy(depth_image)
+#     plt.subplot(1, 2, 1)
+#     plt.imshow(depth_image)
+#     depth_image = div.preprocess_depth_img(depth_image)
+#     plt.subplot(1, 2, 2)
+#     plt.imshow(depth_image)
+#     plt.show()
+#     np.save('./Experiences/Demonstration/tournevis/tournevis1.npy', depth_image)
 
-def get_pred(trainer, depth):
-    depth_image = np.copy(depth)
+###### FOR TESTING ON ROBOT
+def get_pred(camera, trainer):
+    depth_image, _ = camera.get_frame()
+    depth = np.copy(depth_image)
+
+###### FOR TESTING ON DATA ######
+# def get_pred(trainer, depth):
+#     depth_image = np.copy(depth)
     init_shape = depth_image.shape
     depth_image = div.preprocess_depth_img(depth_image)
     depth_image = resize(depth_image, (224, 224, 3), anti_aliasing=True)
@@ -60,7 +62,7 @@ def get_pred(trainer, depth):
     out = out.reshape((224, 224, 3))
     out = resize(out, init_shape)
 
-    viz = False
+    viz = True
     x_pred, y_pred, angle_pred, e_pred, pca_zoom = div.postprocess_pred(out)
 
     if viz:
@@ -155,17 +157,16 @@ def learning(demo_depth_label, explo_depth_label, trainer):
     return trainer
 
 def viz_grap(trainer):
-    x_pred, y_pred, angle_pred, e_pred, depth = get_pred(camera, trainer)
-
+    x_pred, y_pred, angle_pred, e_pred, depth, out = get_pred(camera, trainer)
 
 def grasping(nb_trial):
-    x_pred, y_pred, angle_pred, e_pred, depth = get_pred(camera, trainer)
+    x_pred, y_pred, angle_pred, e_pred, depth, out = get_pred(camera, trainer)
     print('Parametre du rectangle : ecartement {}, angle {}, x: {}, y: {}, longueur pince {}'.format(e_pred,
                                                                                                         angle_pred,
                                                                                                         x_pred,
                                                                                                         y_pred,
                                                                                                         20))
-    target_pos = iiwa.from_camera2robot(depth, int(x_pred), int(y_pred), camera_param=camera_param)
+    target_pos = iiwa.from_camera2robot(depth, int(x_pred+160), int(y_pred), camera_param=camera_param)
     print('Deplacement du robot à : {} avec pour angle {}'.format(target_pos, angle_pred))
     grasp_success = iiwa.grasp(target_pos, angle_pred)
     print('Le grasp a été réussi : ', grasp_success)
@@ -177,7 +178,6 @@ def grasping(nb_trial):
     depth_image = resize(depth_image, (224, 224, 3), order=2, anti_aliasing=True)
     label_plt = div.compute_labels([[x_pred, y_pred, angle_pred, 0.5*e_pred, 0.5*1.2*e_pred, label_value]])
     np.save('Experiences/Exploration/depth_label/depth_parameters_exploration{}.npy'.format(nb_trial), (depth_image, label_plt))
-
     explo_depth_label.append((depth_image, label_plt))
     return x_pred, y_pred
 
@@ -221,7 +221,7 @@ def test(trainer, dodemo, dograsp, dotrain, doreload, ):
         nb_attempt = 0
         while cont == '1':
             viz_grap(trainer)
-            # grasping(nb_attempt)
+            grasping(nb_attempt)
             nb_attempt += 1
             cont = input('Voulez vous continuer ? ')
         # grasping(nb_trial)
@@ -332,15 +332,19 @@ def validation(camera):
 
 if __name__=="__main__":
     ######### Initialisation des différents outils #########
-    # iiwa = Robot()
     camera = RealCamera()
+    camera.start_pipe()
+    time.sleep(1)
+    camera_param = [camera.intr.fx, camera.intr.fy, camera.intr.ppx, camera.intr.ppy, camera.depth_scale]
+
     FT = FingerTracker()
     time.sleep(1)
-    # iiwa.home()
+    iiwa = Robot()
+    iiwa.home()
     ### Quel test va-t-on jouer ? ###
-    testgeneral = False
+    testgeneral = True
     test2 = False
-    automated_test = True
+    automated_test = False
 
 #### Test Automatisé
     if automated_test:
@@ -375,11 +379,8 @@ if __name__=="__main__":
 
 ### Test Général ###
     if testgeneral:
-        trainer = Trainer(savetosnapshot=False, load=False, snapshot_file='ampouletanh')
-        camera.start_pipe()
-        time.sleep(1)
-        camera_param = [camera.intr.fx, camera.intr.fy, camera.intr.ppx, camera.intr.ppy, camera.depth_scale]
-        get_precomputedFrame(camera)
+        trainer = Trainer(savetosnapshot=False, load=True, snapshot_file='ampouletanh')
+
         load_needed = False
         demo_depth_label = []
         explo_depth_label = []
@@ -395,27 +396,33 @@ if __name__=="__main__":
                 for f in explo_depth_label_file:
                     explo_depth_label.append(np.load(f))
 
-            test(trainer, dodemo=False, dograsp=False, dotrain=False, doreload=False)
+            test(trainer, dodemo=False, dograsp=True, dotrain=False, doreload=False)
+            iiwa.iiwa.close()
+
             # validation(camera)
         except Exception as e:
             exc_info = sys.exc_info()
             traceback.print_exception(*exc_info)
+            iiwa.iiwa.close()
+            camera.stop_pipe()
             del exc_info
             pass
 
         except RuntimeError as e:
             exc_info = sys.exc_info()
             traceback.print_exception(*exc_info)
-            # iiwa.iiwa.close()
+            iiwa.iiwa.close()
+            camera.stop_pipe()
 
     if test2:
-        load_trained_network = False
-        snapshot_file = 'Clef_Test6'
-        camera.start_pipe()
-        time.sleep(1)
-        camera_param = [camera.intr.fx, camera.intr.fy, camera.intr.ppx, camera.intr.ppy, camera.depth_scale]
-        get_precomputedFrame(camera)
         try:
+            load_trained_network = False
+            snapshot_file = 'Clef_Test6'
+            camera.start_pipe()
+            time.sleep(1)
+            camera_param = [camera.intr.fx, camera.intr.fy, camera.intr.ppx, camera.intr.ppy, camera.depth_scale]
+
+
             if load_trained_network:
                 trainer = Trainer(savetosnapshot=False, load=True, snapshot_file=snapshot_file)
             else:
