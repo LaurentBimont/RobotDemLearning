@@ -26,6 +26,8 @@ class sunrisePy:
     def send(self,data):
         self.soc.send(data+b"\n")
         msg=self.soc.receive()
+        if msg == "nak":
+            raise ValueError("Received msg is nak, there was a limit violation : watch iiwa log screen for more information")
         return msg
 
     def __createCommand(self,name, data ):

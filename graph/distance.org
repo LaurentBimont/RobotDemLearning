@@ -1,0 +1,25 @@
+#+OPTIONS: H:1 num:nil toc:nil
+
+* Experiment : evaluate grasping precision and repeatability 
+
+** Experiment presentation 
+  #+CAPTION: Tool set used for the experiment. Different classes of objet were used with different size and shape tool
+ #+ATTR_LaTeX: width=0.2\linewidth
+ #+LABEL: fig:outils
+ [[./jeu-outils.jpg]]
+  
+
+ #+CAPTION: Robot configuration 
+ #+ATTR_LaTeX: width=0.2\linewidth
+ #+LABEL: fig:iiwa
+ [[./iiwa_intel.jpg]]
+
+ #+CAPTION: In order to ease measurement colored adhesive are used as a reference point. Thus one can bypass curbersome CAD reconstruction based on the cloud point. 
+ #+ATTR_LaTeX: width=0.2\linewidth
+ #+LABEL: fig:adhesive
+ [[./vis_libellee.jpg]]
+
+
+** Process pipeline 
+1. 
+ 
