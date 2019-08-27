@@ -210,8 +210,9 @@ def onclick(event):
 
 if __name__=="__main__":
     rob = Robot()
-    # rob.home()
+    rob.home()
     print(rob.getCart(), rob.iiwa.getJointsPos())
+    grasp_above = [, ,  angle, 0, np.pi]
 
     try:
         # camera = RealCamera()

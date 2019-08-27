@@ -33,7 +33,6 @@ def py_ang(v1, v2):
 
 def angle2robotangle(angle):
     if angle > 90:
-        print(1)
         angle -= 180
     elif angle < -90:
         print(2)

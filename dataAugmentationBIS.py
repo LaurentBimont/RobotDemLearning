@@ -230,8 +230,6 @@ if __name__=="__main__":
     # plt.imshow(rot_plain_label)
     # plt.show()
 
-
-
     DA = OnlineAugmentation()
     DA.generate_batch(img, label, 0, augmentation_factor=4)
 
