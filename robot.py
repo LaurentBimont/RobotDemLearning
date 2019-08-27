@@ -210,18 +210,29 @@ def onclick(event):
 
 if __name__=="__main__":
     rob = Robot()
-    rob.home()
-    print(rob.getCart(), rob.iiwa.getJointsPos())
-    grasp_above = [, ,  angle, 0, np.pi]
+    # rob.home()
+    # pos = [4.93012815e+02, -5.54576652e+00, 2.11998124e+02, angle, 0, np.pi]
 
+    print('Angle Actuelle : ', rob.iiwa.getEEFPos()[3]*180/np.pi)
+    # grasp_above = [, ,  angle, 0, np.pi]
+    # angle_commanfe = rob.iiwa.getEEFPos()[3]*180/np.pi
+    # for i in range(300):
+    #     angle_commanfe = angle_commanfe + 1
+    #     speed = 20
+    #     print(angle_commanfe)
+    #     angle = angle_commanfe * np.pi/180
+    #     pos = [494, -5, 211, angle, 0, np.pi]
+    #     rob.iiwa.movePTPLineEEF(pos, speed, orientationVel=0.5)
+    #     print('Sleeping in progress...')
+    #     time.sleep(0.05)
     try:
         # camera = RealCamera()
         # camera.start_pipe()
         # camera_param = [camera.intr.fx, camera.intr.fy, camera.intr.ppx, camera.intr.ppy, camera.depth_scale]
         # camera.get_frame()
         # print(camera.color_image)
-        # rob = Robot()
         # print(rob.getCart())
+        # rob = Robot()
         # rob.home()
         # print('Joint Position', rob.iiwa.getJointsPos())
         # cart = rob.from_camera2robot(camera.depth_image, 241, 290, color=camera.color_image, camera_param=camera_param, test_manuel=True)
@@ -236,5 +247,5 @@ if __name__=="__main__":
     except Exception as e:
         exc_info = sys.exc_info()
         print(e)
-        rob.camera.stop_pipe()
+        # rob.camera.stop_pipe()
         rob.iiwa.close()

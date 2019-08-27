@@ -45,37 +45,21 @@ class OnlineAugmentation(object):
             else:
                 noisy_square_im = np.copy(square_im)
 
-            print('Angle ajoutée est : ', angle)
-            print('Angle initial est : ', np.max(square_lab[:, :, 1]))
-            plt.subplot(2, 4, 5)
-            plt.imshow(square_lab)
-
             rot_plain_img, rot_plain_label = rotation_insert(noisy_square_im, square_lab, angle, xc, yc, x_lim, y_lim)
-
             if bool_add_noise:
                 rot_plain_img = add_noise(rot_plain_img)
-
             rot_plain_label = change_ang_value(rot_plain_label, angle)
             self.add_im(rot_plain_img, rot_plain_label)
 
-            plt.subplot(2, 4, 1)
-            plt.imshow(rot_plain_label)
-
             up_down_flip_label = flip_ang_value(np.copy(rot_plain_label), 1)
             self.add_im(np.flip(rot_plain_img, 0), np.flip(up_down_flip_label, 0))
-            plt.subplot(2, 4, 2)
-            plt.imshow(np.flip(up_down_flip_label, 0))
 
             left_right_flip_label = flip_ang_value(np.copy(rot_plain_label), 2)
             self.add_im(np.flip(rot_plain_img, 1), np.flip(left_right_flip_label, 1))
-            plt.subplot(2, 4, 3)
-            plt.imshow(np.flip(left_right_flip_label, 1))
-
+            # plt.imshow(np.flip(left_right_flip_label, 1))
+            # plt.show()
             both_flip_label = flip_ang_value(np.copy(rot_plain_label), 3)
             self.add_im(np.flip(np.flip(rot_plain_img, 1), 0), np.flip(np.flip(both_flip_label, 1), 0))
-            plt.subplot(2, 4, 4)
-            plt.imshow(np.flip(np.flip(both_flip_label, 1), 0))
-            plt.show()
 
             # PETIT TRAVAIL A FAIRE SI ON VEUT RAJOUTER L'ANGLE
             if viz:
@@ -123,12 +107,15 @@ def create_sub_square(im, label, x, y, w, h):
     zoom_im, zoom_lab = im[y:y+h, x:x+w, :], label[y:y+h, x:x+w, :]
     # Mise dans un carré permettant des rotations sans aucun troncage sqrt(2)*c
     great_length = div.evenisation(int(np.sqrt(2)*np.max(zoom_im.shape)) + 1)
-    square_im, square_lab = np.zeros((great_length, great_length, 3)), np.zeros((great_length, great_length, 3), dtype=np.int)
+
+    square_im, square_lab = np.zeros((great_length, great_length, 3)),\
+                            np.zeros((great_length, great_length, 3), dtype=np.int)
+
+
     square_im[great_length//2-h//2:great_length//2+h//2, great_length//2-w//2:great_length//2+w//2, :] = zoom_im[:, :, :]
+
     square_lab[great_length//2-h//2:great_length//2+h//2, great_length//2-w//2:great_length//2+w//2, :] = zoom_lab[:, :, :]
     print('ici')
-    plt.imshow(square_lab)
-    plt.show()
     viz = False
     if viz:
         plt.subplot(1, 2, 1)
@@ -179,11 +166,9 @@ def rotation_insert(img, label, angle, xc, yc, x_lim, y_lim):
 def change_ang_value(label, ang):
 
     square_lab_ang = label[:, :, 1]
-    print('Ancien Angle', np.max(label[:, :, 1])%180)
 
     square_lab_ang[np.where(square_lab_ang != 0)] += ang
     label[:, :, 1] = square_lab_ang%180
-    print('Nouvel Angle', np.max(label[:, :, 1]))
     return label
 
 def flip_ang_value(label, thetype):

@@ -92,9 +92,14 @@ class Trainer(object):
         # expected_reward, action_reward = self.action.compute_reward(self.action.grasp, self.future_reward)
         for l, output in zip(label, self.output_prob):
             l = self.reduced_label(l)[0]
-            l_numpy = l.numpy()
-            weight = np.zeros(l_numpy.shape)
 
+            l_numpy = l.numpy()
+            l_numpy_pos = l_numpy[:, :, 0]
+            l_numpy_pos[l_numpy_pos > 10] = -1
+            l_numpy[:, :, 0] = l_numpy_pos
+            l = tf.convert_to_tensor(l_numpy)
+
+            weight = np.zeros(l_numpy.shape)
             weight = np.abs(output.numpy())
             weight[l_numpy > 0] += 10/(np.sum(l_numpy > 0)+1)       #Initialement 2.
             weight[l_numpy < 0] += 10/(np.sum(l_numpy < 0)+1)       #Initialement 1.
@@ -107,8 +112,8 @@ class Trainer(object):
             # print('Contribution des loss : Huber ({}) et L2 reg ({})'.format(self.loss(l, output, weight)/self.loss_value,
             #       0.000001*lossL2/self.loss_value))
 
-        new_lab = label[0].numpy()
-        new_lab = new_lab.reshape((1, *new_lab.shape))
+            new_lab = l.numpy()
+            new_lab = new_lab.reshape((1, *new_lab.shape))
 
         ######## Partie avec Huber Loss  ############"
         # weight = np.zeros(label_numpy.shape)

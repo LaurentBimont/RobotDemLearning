@@ -31,13 +31,13 @@ from camera import RealCamera
 #     np.save('./Experiences/Demonstration/tournevis/tournevis1.npy', depth_image)
 
 ###### FOR TESTING ON ROBOT
-def get_pred(camera, trainer):
-    depth_image, _ = camera.get_frame()
-    depth = np.copy(depth_image)
+# def get_pred(camera, trainer):
+#     depth_image, _ = camera.get_frame()
+#     depth = np.copy(depth_image)
 
-###### FOR TESTING ON DATA ######
-# def get_pred(trainer, depth):
-#     depth_image = np.copy(depth)
+##### FOR TESTING ON DATA ######
+def get_pred(trainer, depth):
+    depth_image = np.copy(depth)
     init_shape = depth_image.shape
     depth_image = div.preprocess_depth_img(depth_image)
     depth_image = resize(depth_image, (224, 224, 3), anti_aliasing=True)
@@ -143,7 +143,7 @@ def learning(demo_depth_label, explo_depth_label, trainer):
             # plt.show()
             trainer.main_without_backprop(depth,
                                             label,
-                                            augmentation_factor=4,
+                                            augmentation_factor=6,
                                             demo=True)
         for depth, label in explo_depth_label:
             trainer.main_without_backprop(depth,
@@ -166,6 +166,10 @@ def grasping(nb_trial):
                                                                                                         x_pred,
                                                                                                         y_pred,
                                                                                                         20))
+    print(depth.shape, np.zeros((depth.shape[0], 160)).shape)
+    print(type(depth))
+    depth = np.concatenate((np.zeros((depth.shape[0], 160)), depth), axis=1)
+    print(depth.shape)
     target_pos = iiwa.from_camera2robot(depth, int(x_pred+160), int(y_pred), camera_param=camera_param)
     print('Deplacement du robot à : {} avec pour angle {}'.format(target_pos, angle_pred))
     grasp_success = iiwa.grasp(target_pos, angle_pred)
@@ -189,14 +193,14 @@ def load():
     for f in demo_depth_label_file:
         print('Loading : ', f)
         demo_depth_label.append(np.load(f))
-
-    explo_depth_label_file = [join('Experiences/Exploration/depth_label/', f) for f in
-                              listdir('Experiences/Exploration/depth_label/') if
-                              isfile(join('Experiences/Exploration/depth_label/', f))]
-
-    for f in explo_depth_label_file:
-        print('Loading : ', f)
-        explo_depth_label.append(np.load(f))
+    #
+    # explo_depth_label_file = [join('Experiences/Exploration/depth_label/', f) for f in
+    #                           listdir('Experiences/Exploration/depth_label/') if
+    #                           isfile(join('Experiences/Exploration/depth_label/', f))]
+    #
+    # for f in explo_depth_label_file:
+    #     print('Loading : ', f)
+    #     explo_depth_label.append(np.load(f))
 
     return demo_depth_label, explo_depth_label
 
@@ -332,31 +336,31 @@ def validation(camera):
 
 if __name__=="__main__":
     ######### Initialisation des différents outils #########
-    camera = RealCamera()
-    camera.start_pipe()
-    time.sleep(1)
-    camera_param = [camera.intr.fx, camera.intr.fy, camera.intr.ppx, camera.intr.ppy, camera.depth_scale]
-
-    FT = FingerTracker()
-    time.sleep(1)
-    iiwa = Robot()
-    iiwa.home()
+    # camera = RealCamera()
+    # camera.start_pipe()
+    # time.sleep(1)
+    # camera_param = [camera.intr.fx, camera.intr.fy, camera.intr.ppx, camera.intr.ppy, camera.depth_scale]
+    #
+    # FT = FingerTracker()
+    # time.sleep(1)
+    # iiwa = Robot()
+    # iiwa.home()
     ### Quel test va-t-on jouer ? ###
-    testgeneral = True
+    testgeneral = False
     test2 = False
-    automated_test = False
+    automated_test = True
 
 #### Test Automatisé
     if automated_test:
-        load_trained_network = True
-        snapshot_file = 'Clef_Test12'
+        load_trained_network = False
+        snapshot_file = 'Clef_poisition_1_demo_2'
         try:
             if load_trained_network:
                 trainer = Trainer(savetosnapshot=False, load=True, snapshot_file=snapshot_file)
             else:
                 trainer = Trainer(savetosnapshot=True, load=False, snapshot_file=snapshot_file)
-                main_test(trainer, dotrain=True, dograsp=False)
-            distance_array = main_test(trainer, dograsp=True, dotrain=False)
+                main_test(trainer, dotrain=True)
+            distance_array = main_test(trainer, dograsp=True)
             print('Nombre de réussite : {}/{} '.format(np.sum(np.array(distance_array) < 60), len(distance_array)))
 
         except Exception as e:
@@ -417,11 +421,10 @@ if __name__=="__main__":
     if test2:
         try:
             load_trained_network = False
-            snapshot_file = 'Clef_Test6'
-            camera.start_pipe()
-            time.sleep(1)
-            camera_param = [camera.intr.fx, camera.intr.fy, camera.intr.ppx, camera.intr.ppy, camera.depth_scale]
-
+            snapshot_file = 'Clef_poisition_1_demo_1'
+            # camera.start_pipe()
+            # time.sleep(1)
+            # camera_param = [camera.intr.fx, camera.intr.fy, camera.intr.ppx, camera.intr.ppy, camera.depth_scale]
 
             if load_trained_network:
                 trainer = Trainer(savetosnapshot=False, load=True, snapshot_file=snapshot_file)
@@ -430,24 +433,22 @@ if __name__=="__main__":
                 main_distance(trainer, dodemo=False, dotrain=True, dograsp=False, doreload=True)
             main_distance(trainer, dograsp=True, dodemo=False, dotrain=False, doreload=False)
             # validation(camera)
-            camera.stop_pipe()
+            # camera.stop_pipe()
 
         except Exception as e:
             exc_info = sys.exc_info()
             traceback.print_exception(*exc_info)
-            camera.stop_pipe()
+            # camera.stop_pipe()
             # iiwa.iiwa.close()
             del exc_info
             pass
 
         except KeyboardInterrupt:
             print("fin programme")
-            camera.stop_pipe()
+            # camera.stop_pipe()
 
         except RuntimeError as e:
             exc_info = sys.exc_info()
             traceback.print_exception(*exc_info)
-            camera.stop_pipe()
+            # camera.stop_pipe()
             # iiwa.iiwa.close()
-
-

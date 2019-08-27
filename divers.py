@@ -32,11 +32,12 @@ def py_ang(v1, v2):
         return np.arctan2(sinang, cosang)
 
 def angle2robotangle(angle):
-    if angle > 90:
-        angle -= 180
-    elif angle < -90:
-        print(2)
-        # angle += 180
+    angle = (angle+90) % 180 - 90
+    # if angle > 90:
+    #     angle -= 180
+    # elif angle < -90:
+    #     print(2)
+    #     # angle += 180
     angle -= 180
     return angle
 

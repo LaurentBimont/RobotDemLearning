@@ -127,9 +127,10 @@ class RealCamera:
         :return: return the view in 3D space
         '''
         if image is None:
-            d = self.depth_image[u, v]
+            d = self.depth_image[v, u]
         else:
-            d = image[u, v]
+            print(image.shape)
+            d = image[v, u]
         if param is None:
             depth_scale = self.depth_scale
             fx, fy, Cx, Cy = self.intr.fx, self.intr.fy, self.intr.ppx, self.intr.ppy
@@ -161,7 +162,6 @@ class RealCamera:
             x = (u - Cy) * z / fy
             y = (v - Cx) * z / fx
             list3d[u, v, :] = np.array([x, y, z])
-
         return list3d
 
     def erase_background(self):
@@ -178,6 +178,7 @@ class RealCamera:
         profile = self.profile.get_stream(rs.stream.depth)  # Fetch stream profile for depth stream
         self.intr = profile.as_video_stream_profile().get_intrinsics()  # Downcast to video_stream_profile and fetch intrinsics
 
+
 if __name__=='__main__':
     Cam = RealCamera()
     Cam.start_pipe(usb3=True)
@@ -190,4 +191,3 @@ if __name__=='__main__':
             break
 
     Cam.stop_pipe()
-

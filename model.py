@@ -192,6 +192,7 @@ class GraspNetTest(BaseDeepModel):
         #     x[i, :, :, :] = tf.div(tf.subtract(x[i, :, :, :], tf.reduce_min(x[i, :, :, :])),
         #                            tf.subtract(tf.reduce_max(x[i, :, :, :]), tf.reduce_min(x[i, :, :, :])))
         # x = tf.div(tf.subtract(x, tf.reduce_min(x)), tf.subtract(tf.reduce_max(x), tf.reduce_min(x)))
+
         return x
 
 class GraspNet(BaseDeepModel):
@@ -235,7 +236,7 @@ class GraspNet(BaseDeepModel):
         # self.tconv0 = tf.keras.layers.Conv2DTranspose(32, kernel_size=(2, 2), strides=3, activation=tf.nn.relu,
         #                                               use_bias=True, padding='same', name="tgrasp_conv0",
         #                                               trainable=True)
-        
+
     def call(self, inputs, bufferize=False, step_id=-1):
         # print('Entrée du réseau seondaire', inputs.shape)
         #x = self.bn0(inputs)
