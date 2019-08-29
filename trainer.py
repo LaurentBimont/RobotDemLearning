@@ -99,7 +99,6 @@ class Trainer(object):
             l_numpy[:, :, 0] = l_numpy_pos
             l = tf.convert_to_tensor(l_numpy)
 
-            weight = np.zeros(l_numpy.shape)
             weight = np.abs(output.numpy())
             weight[l_numpy > 0] += 10/(np.sum(l_numpy > 0)+1)       #Initialement 2.
             weight[l_numpy < 0] += 10/(np.sum(l_numpy < 0)+1)       #Initialement 1.
@@ -270,7 +269,7 @@ class Trainer(object):
             if batch % 20 == 0:
                 print('{}/{}'.format(batch, len(self.dataset['im'])//batch_size))
 
-    def main_xpreplay(self, nb_epoch=2, batch_size=3, nb_batch=400):
+    def main_xpreplay(self, random_param=0.7, nb_epoch=2, batch_size=3, nb_batch=800):
         self.exp_rpl.generate_ranking()
         for epoch in range(nb_epoch):
 
@@ -278,7 +277,7 @@ class Trainer(object):
                 if batch % 20 == 0:
                     print('La valeur de perte : {}'.format(self.loss_value.numpy()))
                     print('Epoch {}/{}, Batch {}/{}'.format(epoch + 1, nb_epoch, batch + 1, nb_batch))
-                batch_im, batch_lab = self.exp_rpl.replay(0.7, batch_size=batch_size)
+                batch_im, batch_lab = self.exp_rpl.replay(random_param, batch_size=batch_size)
                 # plt.imshow(batch_im[0, :, :, 0])
                 # plt.show()
                 self.main_batches(batch_im, batch_lab)

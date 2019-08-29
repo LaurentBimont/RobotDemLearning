@@ -74,6 +74,10 @@ class RealCamera:
 
     def show(self):
         temp_depth = self.depth_image
+        # mini = np.min(self.depth_image)
+        # mean = np.mean(self.depth_image)
+        # median = np.median(self.depth_image)
+        # temp_depth[temp_depth<median] = mini
         temp_depth[temp_depth==0.] = np.max(temp_depth)
         print(np.min(temp_depth), np.mean(temp_depth))
         plt.subplot(1, 3, 1)
@@ -105,6 +109,7 @@ class RealCamera:
 
         self.depth_image = np.asanyarray(self.depth_image.get_data())*self.depth_scale
         self.depth_image[self.depth_image > 6] = 0.
+
         self.depth_mask = np.copy(self.depth_image)
         self.depth_mask[self.depth_mask > 0.] = 1
         self.depth_mask = self.depth_mask.astype('uint8')
@@ -165,6 +170,7 @@ class RealCamera:
         return list3d
 
     def erase_background(self):
+        self.np.mean()
         pass
 
     def store(self):
