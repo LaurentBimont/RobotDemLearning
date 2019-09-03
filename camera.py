@@ -62,6 +62,7 @@ class RealCamera:
                 self.hole_filling = rs.hole_filling_filter()
                 self.temporal_filter = rs.temporal_filter()
                 self.spatial_filter = rs.spatial_filter()
+                self.depth_to_disparity = rs.disparity_transform(False)
                 # Get Intrinsic parameters
                 self.get_intrinsic()
                 print('Caméra Ouverte')
@@ -98,14 +99,16 @@ class RealCamera:
 
         # Get aligned frames
         frames = []
-        for x in range(10):
+        for x in range(40):
             temp_filtered = self.temporal_filter.process(aligned_frames.get_depth_frame())
         # aligned_depth_frame = aligned_frames.get_depth_frame()  # aligned_depth_frame is a 640x480 depth image
-        color_frame = aligned_frames.get_color_frame()
 
+        color_frame = aligned_frames.get_color_frame()
         # Processing
-        self.depth_image = self.spatial_filter.process(temp_filtered)
-        self.depth_image = self.hole_filling.process(self.depth_image)
+        self.depth_image = self.hole_filling.process(temp_filtered)
+
+        self.depth_image = self.spatial_filter.process(self.depth_image)
+        self.depth_image = self.depth_to_disparity.process(self.depth_image)
 
         self.depth_image = np.asanyarray(self.depth_image.get_data())*self.depth_scale
         self.depth_image[self.depth_image > 6] = 0.

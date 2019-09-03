@@ -187,7 +187,9 @@ class Robot:
         grasp_above = [pos[0], pos[1], pos[2]+100., angle, 0, np.pi]
         print('Grasping à ', grasp_above)
         self.iiwa.movePTPLineEEF(grasp_above, 4*speed, orientationVel=0.5)
-        self.grip.openGripper()
+
+        # self.grip.openGripper()
+        self.grip.goTomm(75)
         grasp = [pos[0], pos[1], pos[2], angle, 0, np.pi]
         self.iiwa.movePTPLineEEF(grasp, speed, orientationVel=0.1)
         self.grip.closeGripper()
@@ -199,7 +201,8 @@ class Robot:
         #     jpos[6] = (jpos[6] + 0.4) % (np.pi/2)
         #     self.iiwa.movePTPJointSpace(jpos,0.1)
 
-        self.grip.openGripper()
+        # self.grip.openGripper()
+        self.grip.goTomm(75)
         self.home()
         return self.grip.isObjectDetected()
 

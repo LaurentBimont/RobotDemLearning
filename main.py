@@ -130,8 +130,8 @@ def validation(camera):
 
 def learning(demo_depth_label, explo_depth_label, trainer):
     nb_epoch = 4
-    xp_replay_random = [0.3, 0.5, 0.7, 0.7]
-
+    # xp_replay_random = [0.3, 0.5, 0.7, 0.7]
+    xp_replay_random = [0., 0., 0., 0.]
     for i in range(nb_epoch):
         print('#### EPOCH {}/{} ####'.format(i+1, nb_epoch))
         trainer.exp_rpl.clean()
@@ -276,7 +276,7 @@ def main_distance(trainer, dodemo, dograsp, dotrain, doreload):
 
     if dograsp:
         cont = '1'
-        nb_attempt = 0
+        nb_attempt = 23
         while cont == '1':
             x_pred, y_pred, _, _, depth, _ = get_pred(camera, trainer)
             # Transfer the predicting grasping point into robot cartesian coordinates
@@ -335,7 +335,7 @@ def validation(camera):
                 with open("distance.csv","w+") as f: 
                     print("distance ref demo : {} ".format(d1))
                     print("distance ref decision : {} ".format(d2)) 
-                    line = ";".join(map(str, [d1,d2,abs(d1-d2),"\n"])) 
+                    line = ";".join(map(str, [d1, d2, abs(d1-d2), "\n"]))
                     f.write(line)
         except KeyboardInterrupt:
             print("fin programme")
@@ -357,7 +357,7 @@ if __name__=="__main__":
 #### Test Automatisé
     if automated_test:
         load_trained_network = True
-        snapshot_file = 'Ampoule_position_1_Clef_position_1_demo_6'
+        snapshot_file = 'Pince_Ampoule_Demo_4'
         try:
             if load_trained_network:
                 trainer = Trainer(savetosnapshot=False, load=True, snapshot_file=snapshot_file)
@@ -426,7 +426,7 @@ if __name__=="__main__":
                 trainer = Trainer(savetosnapshot=False, load=True, snapshot_file=snapshot_file)
             else:
                 trainer = Trainer(savetosnapshot=True, load=False, snapshot_file=snapshot_file)
-                main_distance(trainer, dodemo=False, dotrain=True, dograsp=False, doreload=True)
+                main_distance(trainer, dodemo=True, dotrain=False, dograsp=False, doreload=False)
             main_distance(trainer, dograsp=True, dodemo=False, dotrain=False, doreload=False)
             # validation(camera)
             camera.stop_pipe()

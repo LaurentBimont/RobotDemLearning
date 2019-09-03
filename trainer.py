@@ -20,11 +20,12 @@ import tfmpl                             # Put matplotlib figures in tensorboard
 import os
 from skimage.transform import resize
 from experienceReplay import ExperienceReplay
+
 class Trainer(object):
     def __init__(self, savetosnapshot=True, load=False, snapshot_file='name'):
         super(Trainer, self).__init__()
         self.myModel = mod.Reinforcement()
-        self.optimizer = tf.train.MomentumOptimizer(learning_rate=5e-4, momentum=0.9)
+        self.optimizer = tf.train.MomentumOptimizer(learning_rate=1e-4, momentum=0.9)
         self.action = RM.RewardManager()
         self.width, self.height = 0, 0
         self.best_idx, self.future_reward = [0, 0], 0
@@ -100,16 +101,17 @@ class Trainer(object):
             l = tf.convert_to_tensor(l_numpy)
 
             weight = np.abs(output.numpy())
-            weight[l_numpy > 0] += 10/(np.sum(l_numpy > 0)+1)       #Initialement 2.
-            weight[l_numpy < 0] += 10/(np.sum(l_numpy < 0)+1)       #Initialement 1.
-            weight[l_numpy == 0] += 1/(np.sum(l_numpy == 0)+1)      #Initialement 0.2
+            weight[l_numpy > 0] += 40/(np.sqrt(np.sum(l_numpy > 0)+1))       #Initialement 2.
+            weight[l_numpy < 0] += 40/(np.sqrt(np.sum(l_numpy < 0)+1))       #Initialement 1.
+            weight[l_numpy == 0] += 1/(np.sqrt(np.sum(l_numpy == 0)+1))      #Initialement 0.2
+            # print(1/(np.log(np.sum(l_numpy == 0)+2)), 1/(np.log(np.sum(l_numpy > 0)+2)))
             # print('Les poids : ', 1/(np.sum(l_numpy > 0)+1), 1/(np.sum(l_numpy < 0)+1), 1/(np.sum(l_numpy == 0)+1))
 
             lossL2 = tf.add_n([tf.nn.l2_loss(v) for v in self.vars])
-            self.loss_value = self.loss(l, output, weight) + 0.000001 * lossL2
+            self.loss_value = self.loss(l, output, weight) + 0.00005 * lossL2
             # print('Contribution pour chaque classe \n 1 {} \n -1 {} \n 0 {}'.format(10/(np.sum(l_numpy > 0)+1), 10/(np.sum(l_numpy < 0)+1), 1/(np.sum(l_numpy == 0)+1)))
-            # print('Contribution des loss : Huber ({}) et L2 reg ({})'.format(self.loss(l, output, weight)/self.loss_value,
-            #       0.000001*lossL2/self.loss_value))
+            print('Contribution des loss : Huber ({}) et L2 reg ({})'.format(self.loss(l, output, weight)/self.loss_value,
+                  0.00005*lossL2/self.loss_value))
 
             new_lab = l.numpy()
             new_lab = new_lab.reshape((1, *new_lab.shape))
@@ -249,14 +251,6 @@ class Trainer(object):
         label = best_pix
         im = tf.image.resize_images(im, (224, 224), method=tf.image.ResizeMethod.NEAREST_NEIGHBOR)
         label = tf.image.resize_images(label, (224, 224), method=tf.image.ResizeMethod.NEAREST_NEIGHBOR)
-        # im = resize(im, (224, 224, 3), anti_aliasing=True)
-        # label = resize(label, (224, 224, 3), anti_aliasing=True)
-
-        # plt.subplot(1, 2, 1)
-        # plt.imshow(im[:, :, 0])
-        # plt.subplot(1, 2, 2)
-        # plt.imshow(label[:, :, 0])
-        # plt.show()
         print('Data Augmentation')
         self.dataset = da.OnlineAugmentation().generate_batch(im.numpy(), label.numpy(), np.mean(im), augmentation_factor=augmentation_factor, viz=False)
 

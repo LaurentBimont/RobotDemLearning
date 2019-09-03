@@ -46,6 +46,7 @@ def preprocess_depth_img(depth_image):
     # plt.imshow(depth_image)
     # plt.show()
     depth_image[depth_image > 0.461] = 0
+    # depth_image[depth_image > 0.457] = 0
     depth_image[depth_image < 0.35] = 0
     depth_image[depth_image != 0] = 1
 
