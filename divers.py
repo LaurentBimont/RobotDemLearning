@@ -100,7 +100,6 @@ def postprocess_pred(out):
     plt.subplot(1, 3, 3)
     plt.imshow(out[:, :, 1])
     plt.show()
-    np.save('test_pca.npy', test_pca)
     # PointCloud = heatmap2pointcloud(test_pca)
     pca = PCA()
     pca.fit(np.argwhere(test_pca != 0))
@@ -125,32 +124,6 @@ def get_ecartement_pince(vp, theta, center, camera):
     e = np.sqrt((P0-P1).dot(P0-P1))
     alpha = 1
     return e*alpha
-
-   #  heightmap = im.copy()
-   #  im2 = heightmap[:,:,1]
-   #  im2 = (im2-np.min(im2))/(np.max(im2)-np.min(im2))
-   #  im2 = im2*255
-   #  im2 = im2.astype(np.uint8)
-
-   #  ret,thresh = cv2.threshold(im2,60,255,0)
-   #  contours,hierarchy = cv2.findContours(thresh, 1, 2)
-   #  cnt = contours[0]
-   #  rect = cv2.minAreaRect(cnt)
-   #  box = cv2.boxPoints(rect)
-   #  box = np.int0(box)
-   #  cv2.drawContours(heightmap,[box],0,(0,0,255),2)
-   #  ellipse = cv2.fitEllipse(cnt)
-
-   #  cv2.ellipse(heightmap,ellipse,(0,255,0),2)
-   #  cv2.drawContours(heightmap,[box],0,(0,0,255),2)
-
-   #  plt.imshow(heightmap)
-   #  plt.show()
-   #  a = (ellipse[0][0]-ellipse[1][0])/2
-   #  b = (ellipse[0][1]-ellipse[1][1])/2
-   #  a = min(a,b)
-
-   # return a 
 
 def get_angle(fingers):
     u1, v1, u2, v2 = fingers[0], fingers[1], fingers[2], fingers[3]

@@ -189,26 +189,20 @@ class Robot:
         print('Grasping à ', grasp_above)
         self.iiwa.movePTPLineEEF(grasp_above, 8*speed, orientationVel=1)
 
-        # self.grip.openGripper()
         self.grip.goTo(75)
         grasp = [pos[0], pos[1], pos[2], angle, 0, np.pi]
         self.iiwa.movePTPLineEEF(grasp, speed, orientationVel=0.1)
         self.grip.closeGripper()
         time.sleep(1)
-        print('Objet Détectée', self.grip.isObjectDetected())
-        ### Fait une rotation de l'objet ###
-        # if self.grip.isObjectDetected():
-        #     jpos = self.iiwa.getJointsPos()
-        #     jpos[6] = (jpos[6] + 0.4) % (np.pi/2)
-        #     self.iiwa.movePTPJointSpace(jpos,0.1)
+        grasp_success = self.grip.isObjectDetected()
+        print('Objet Détectée', grasp_success)
 
-        # self.grip.openGripper()
         self.iiwa.movePTPLineEEF(grasp_above, 8*speed, orientationVel=1)
         self.iiwa.movePTPLineEEF([814, -52.5, 283.6, -1.64, -0, -2.36], 8*speed, orientationVel=1)
         input('Tapez quand vous etes pret a recuperer : ')
         self.grip.goTo(60)
         self.home()
-        return self.grip.isObjectDetected()
+        return grasp_success
 
 def onclick(event):
     global x_click, y_click
