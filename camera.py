@@ -88,6 +88,14 @@ class RealCamera:
         plt.subplot(1, 3, 3)
         plt.imshow(self.mask_color)
         plt.show()
+        plt.imshow(self.color_image[:,:,[2,1,0]])
+        plt.show()
+        plt.imshow(temp_depth)
+        plt.show()
+        temp_depth[temp_depth<0.45] = 255
+        temp_depth[temp_depth!=255] = 0
+        plt.imshow(temp_depth)
+        plt.show()
 
     def get_frame(self):
         # Get frameset of color and depth
@@ -137,17 +145,20 @@ class RealCamera:
         if image is None:
             d = self.depth_image[v, u]
         else:
-            print(image.shape)
             d = image[v, u]
         if param is None:
             depth_scale = self.depth_scale
             fx, fy, Cx, Cy = self.intr.fx, self.intr.fy, self.intr.ppx, self.intr.ppy
         else:
             fx, fy, Cx, Cy, depth_scale = param
+        print('Voici les paramètres : \n u : {} \n v : {} \n d : {} \n Cx : {}, \n Cy : {}, \n fx : {}, \n fy : {}'.format(u, v, d, Cx, Cy, fx, fy))
         z = d / depth_scale
         # print('Cy : {} ; Cx : {} ; image dimension {}'.format(Cy, Cx, self.depth_image.shape))
         y = (u - Cy) * z / fy
         x = (v - Cx) * z / fx
+
+        print('Voici les paramètres : \n u : {} \n v : {} \n d : {} \n Cx : {}, \n Cy : {}, \n fx : {}, \n fy : {}\n x {} \n y {} \n z {}'.format(u, v, d, Cx, Cy, fx, fy, x, y, z))
+
         P = np.array([x, y, z])
         return P
 

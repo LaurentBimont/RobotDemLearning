@@ -31,13 +31,13 @@ from camera import RealCamera
 #     np.save('./Experiences/Demonstration/tournevis/tournevis1.npy', depth_image)
 
 ###### FOR TESTING ON ROBOT
-# def get_pred(camera, trainer):
-#     depth_image, _ = camera.get_frame()
-#     depth = np.copy(depth_image)
+def get_pred(camera, trainer, num):
+    depth_image, _ = camera.get_frame()
+    depth = np.copy(depth_image)
 
 ##### FOR TESTING ON DATA ######
-def get_pred(trainer, depth):
-    depth_image = np.copy(depth)
+# def get_pred(trainer, depth):
+#     depth_image = np.copy(depth)
 ################################
     init_shape = depth_image.shape
     depth_image = div.preprocess_depth_img(depth_image)
@@ -48,45 +48,65 @@ def get_pred(trainer, depth):
     # batch_img, batch_lab = trainer.exp_rpl.replay(1)
     copy_depth = depth_image.copy()
 
-    ##### To compare images between training and testing
-    # plt.subplot(1, 2, 1)
-    # plt.imshow(batch_img[0])
-    # plt.subplot(1, 2, 2)
-    # plt.imshow(depth_image[0])
-    # plt.show()
-    ######
-
     output_prob = trainer.forward(depth_image)
     out_numpy = output_prob[0].numpy()
     out = trainer.prediction_viz(out_numpy, depth_image)
-
     out = out.reshape((224, 224, 3))
     out = resize(out, init_shape)
-
+    out_viz = out[:, :, 1]*2 - 1
     viz = False
     x_pred, y_pred, angle_pred, e_pred, pca_zoom = div.postprocess_pred(out)
-
+    x_pred += 6
+    y_pred += 6
     if viz:
         rect = div.draw_rectangle(e_pred, angle_pred, x_pred, y_pred, 20)
         optim_rectangle = cv2.fillConvexPoly(np.zeros(out.shape[:2]), rect, color=1)
+        plt.imshow(out)
+        plt.show()
         plt.subplot(1, 2, 1)
         plt.imshow(out)
-        plt.plot([rect[0][0], rect[1][0]], [rect[0][1], rect[1][1]], linewidth=2, color='yellow')
-        plt.plot([rect[2][0], rect[3][0]], [rect[2][1], rect[3][1]], linewidth=2, color='yellow')
-
+        plt.plot([rect[0][0], rect[1][0]], [rect[0][1], rect[1][1]], linewidth=4, color='blue')
+        plt.plot([rect[2][0], rect[3][0]], [rect[2][1], rect[3][1]], linewidth=4, color='blue')
+        plt.scatter(x_pred, y_pred, color='blue')
         # plt.subplot(1, 2, 2)
         # cop_copy_depth = copy_depth[0, :, :, :]
         # cop_copy_depth[cop_copy_depth==0.] = np.max(cop_copy_depth)
         # plt.imshow(cop_copy_depth)
-
         # plt.scatter(int(x_pred), int(y_pred))
         plt.subplot(1, 2, 2)
-        plt.imshow(out[:, :, 1])
+        plt.imshow(out)
         plt.show()
+
+    depth_mask = np.copy(depth)
+    depth_mask[depth_mask>0.45] = 0
+    depth_mask[depth_mask!=0] = 1
+
+    out[:, :, 1] = (out[:, :, 1] - 0.5) * 2
+    desired_output = out[:, :, 1]*(out[:, :, 0] != 0).astype(np.int)
+    rect = div.draw_rectangle(e_pred, angle_pred, x_pred, y_pred, 20)
+    optim_rectangle = cv2.fillConvexPoly(np.zeros(out.shape[:2]), rect, color=1)
+
+    plt.imshow(desired_output, vmin=-1, vmax=1, cmap='RdYlGn')
+    plt.colorbar(label='Value of Output')
+
+    plt.plot([rect[0][0], rect[1][0]], [rect[0][1], rect[1][1]], linewidth=2, color='blue')
+    plt.plot([rect[2][0], rect[3][0]], [rect[2][1], rect[3][1]], linewidth=2, color='blue')
+    plt.scatter(x_pred, y_pred, color='blue')
+    plt.savefig('figvideo/output_ClefAmpoule{}.png'.format(num), dpi=800)
+    plt.show()
+
+    # depth[depth>0.45] = 0
+    # depth[depth!=0] = 255
+    # plt.imshow(depth)
+    # plt.show()
+    # plt.imshow(out_viz, vmin=-1, vmax=1, cmap='RdYlGn')
+    # plt.colorbar(label='Value of Output')
+    # plt.show()
+
     return x_pred, y_pred, angle_pred, e_pred, depth, out
 
 def demo(nb_demo):
-    for i in range(nb_demo):
+    for i in range(1, nb_demo):
         xp_param = []
         x, y = 0, 0
         keep, other_point = '0', '1'
@@ -163,16 +183,14 @@ def viz_grap(trainer):
     x_pred, y_pred, angle_pred, e_pred, depth, out = get_pred(camera, trainer)
 
 def grasping(nb_trial):
-    x_pred, y_pred, angle_pred, e_pred, depth, out = get_pred(camera, trainer)
+    x_pred, y_pred, angle_pred, e_pred, depth, out = get_pred(camera, trainer, nb_trial)
     print('Parametre du rectangle : ecartement {}, angle {}, x: {}, y: {}, longueur pince {}'.format(e_pred,
                                                                                                         angle_pred,
                                                                                                         x_pred,
                                                                                                         y_pred,
                                                                                                         20))
-    print(depth.shape, np.zeros((depth.shape[0], 160)).shape)
-    print(type(depth))
+
     depth = np.concatenate((np.zeros((depth.shape[0], 160)), depth), axis=1)
-    print(depth.shape)
     target_pos = iiwa.from_camera2robot(depth, int(x_pred+160), int(y_pred), camera_param=camera_param)
     print('Deplacement du robot à : {} avec pour angle {}'.format(target_pos, angle_pred))
     grasp_success = iiwa.grasp(target_pos, angle_pred)
@@ -227,7 +245,7 @@ def test(trainer, dodemo, dograsp, dotrain, doreload, ):
         cont = '1'
         nb_attempt = 0
         while cont == '1':
-            viz_grap(trainer)
+            # viz_grap(trainer)
             grasping(nb_attempt)
             nb_attempt += 1
             cont = input('Voulez vous continuer ? ')
@@ -244,20 +262,22 @@ def main_test(trainer, dotrain=False, dograsp=False):
     if dograsp:
         for i in range(36):
             # if (i != 8) and (i!=25):  ## Pour Ampoule
-            # if (i!=0) and (i!=9) and (i!=26) and (i!=35):
-            depth = np.load('Automated_test/Test_{}.npy'.format(i))
-            good_pos = np.load('Automated_test/Good_Point{}.npy'.format(i))
-            x_pred, y_pred, _, _, depth, out = get_pred(trainer, depth)
-            distance = np.sqrt((good_pos[0]-x_pred)**2 + (good_pos[1]-y_pred)**2)
-            distance_array.append(distance)
-            print('La distance est de : ', distance)
-            plt.subplot(1, 2, 1)
-            plt.imshow(depth)
-            plt.scatter(good_pos[0], good_pos[1], color='red')
-            plt.scatter(x_pred, y_pred, color='black')
-            plt.subplot(1, 2, 2)
-            plt.imshow(out[:, :, 1])
-            plt.show()
+            if (i!=0) and (i!=9) and (i!=26) and (i!=35):
+                depth = np.load('Automated_test/Test_{}.npy'.format(i))
+                good_pos = np.load('Automated_test/Good_Point{}.npy'.format(i))
+                x_pred, y_pred, _, _, depth, out = get_pred(trainer, depth)
+                distance = np.sqrt((good_pos[0]-x_pred)**2 + (good_pos[1]-y_pred)**2)
+                distance_array.append(distance)
+                print('La distance est de : ', distance)
+                plt.subplot(1, 2, 1)
+                plt.imshow(depth)
+                plt.scatter(good_pos[0], good_pos[1], color='red')
+                plt.scatter(x_pred, y_pred, color='black')
+                plt.subplot(1, 2, 2)
+                viz_out = out[:,:,1]
+                viz_out[viz_out==0] = 0.5
+                plt.imshow(viz_out, cmap='RdYlGn', vmin=0, vmax=1)
+                plt.show()
     return distance_array
 
 def main_distance(trainer, dodemo, dograsp, dotrain, doreload):
@@ -276,7 +296,7 @@ def main_distance(trainer, dodemo, dograsp, dotrain, doreload):
 
     if dograsp:
         cont = '1'
-        nb_attempt = 23
+        nb_attempt = 8
         while cont == '1':
             x_pred, y_pred, _, _, depth, _ = get_pred(camera, trainer)
             # Transfer the predicting grasping point into robot cartesian coordinates
@@ -342,22 +362,20 @@ def validation(camera):
 
 if __name__=="__main__":
     ######### Initialisation des différents outils #########
-    # camera = RealCamera()
-    # camera.start_pipe()
-    # time.sleep(1)
-    # camera_param = [camera.intr.fx, camera.intr.fy, camera.intr.ppx, camera.intr.ppy, camera.depth_scale]
-
-    # FT = FingerTracker()
-    # time.sleep(1)
-    # iiwa = Robot()
-    # iiwa.home()
+    camera = RealCamera()
+    camera.start_pipe()
+    time.sleep(1)
+    camera_param = [camera.intr.fx, camera.intr.fy, camera.intr.ppx, camera.intr.ppy, camera.depth_scale]
+    FT = FingerTracker()
+    time.sleep(1)
+    iiwa = Robot()
+    iiwa.home()
     ### Quel test va-t-on jouer ? ###
-    testrobot, test2, automated_test = False, False, True
-
+    testrobot, test2, automated_test = True, False, False
 #### Test Automatisé
     if automated_test:
         load_trained_network = True
-        snapshot_file = 'Pince_Ampoule_Demo_4'
+        snapshot_file = 'Vis_1_Demo_'
         try:
             if load_trained_network:
                 trainer = Trainer(savetosnapshot=False, load=True, snapshot_file=snapshot_file)
@@ -366,16 +384,13 @@ if __name__=="__main__":
                 main_test(trainer, dotrain=True)
             distance_array = main_test(trainer, dograsp=True)
             print('Nombre de réussite : {}/{} '.format(np.sum(np.array(distance_array) > 60), len(distance_array)))
-
         except Exception as e:
             exc_info = sys.exc_info()
             traceback.print_exception(*exc_info)
             del exc_info
             pass
-
         except KeyboardInterrupt:
             print("fin programme")
-
         except RuntimeError as e:
             exc_info = sys.exc_info()
             traceback.print_exception(*exc_info)
@@ -383,7 +398,6 @@ if __name__=="__main__":
 ### Test Général ###
     if testrobot:
         trainer = Trainer(savetosnapshot=False, load=True, snapshot_file='ampouletanh')
-
         load_needed = True
         demo_depth_label = []
         explo_depth_label = []
@@ -402,7 +416,6 @@ if __name__=="__main__":
             test(trainer, dodemo=False, dograsp=True, dotrain=False, doreload=False)
             iiwa.iiwa.close()
 
-            # validation(camera)
         except Exception as e:
             exc_info = sys.exc_info()
             traceback.print_exception(*exc_info)
@@ -419,29 +432,28 @@ if __name__=="__main__":
 
     if test2:
         try:
-            load_trained_network = True
-            snapshot_file = 'Clef_position_2_demo_3'
-
+            load_trained_network = False
+            snapshot_file = 'Ampoule1_Clef1_demo6'
             if load_trained_network:
                 trainer = Trainer(savetosnapshot=False, load=True, snapshot_file=snapshot_file)
             else:
                 trainer = Trainer(savetosnapshot=True, load=False, snapshot_file=snapshot_file)
-                main_distance(trainer, dodemo=True, dotrain=False, dograsp=False, doreload=False)
+                main_distance(trainer, dodemo=False, dotrain=True, dograsp=False, doreload=True)
             main_distance(trainer, dograsp=True, dodemo=False, dotrain=False, doreload=False)
             # validation(camera)
-            camera.stop_pipe()
+            # camera.stop_pipe()
 
         except Exception as e:
             exc_info = sys.exc_info()
             traceback.print_exception(*exc_info)
-            camera.stop_pipe()
+            # camera.stop_pipe()
             # iiwa.iiwa.close()
             del exc_info
             pass
 
         except KeyboardInterrupt:
             print("Keyboard Interrupt : fin programme")
-            camera.stop_pipe()
+            # camera.stop_pipe()
             # iiwa.iiwa.close()
 
         except RuntimeError as e:

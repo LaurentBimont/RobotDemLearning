@@ -92,11 +92,13 @@ def postprocess_pred(out):
     out[:, :, 1] = out[:, :, 1]*(out[:, :, 0] != 0).astype(np.int)
     (y_max, x_max) = np.unravel_index(out[:, :, 1].argmax(), out[:, :, 1].shape)
     y_max, x_max = y_max, x_max
-    plt.subplot(1, 2, 1)
+    plt.subplot(1, 3, 1)
     plt.imshow(out[:, :, 0])
     test_pca = out[max(y_max-zoom_pixel, 0):min(y_max+zoom_pixel, out.shape[0]), max(x_max-zoom_pixel, 0):min(x_max+zoom_pixel, out.shape[1]), 0]
-    plt.subplot(1, 2, 2)
+    plt.subplot(1, 3, 2)
     plt.imshow(test_pca)
+    plt.subplot(1, 3, 3)
+    plt.imshow(out[:, :, 1])
     plt.show()
     np.save('test_pca.npy', test_pca)
     # PointCloud = heatmap2pointcloud(test_pca)
@@ -108,7 +110,7 @@ def postprocess_pred(out):
     vectors[1] *= sing_val[1]
     np.linalg.norm(pca.singular_values_)
     origin = [zoom_pixel], [zoom_pixel]
-    e = 30
+    e = 80
     theta = py_ang([1, 0], vectors[1])*180/np.pi
     # e_mm = get_ecartement_pince(sing_val[1], theta, (y_max, x_max), camera)
     return x_max, y_max, theta, e, test_pca
@@ -116,19 +118,15 @@ def postprocess_pred(out):
 def get_ecartement_pince(vp, theta, center, camera):
     sigma = 2*np.sqrt(vp)
     v0, u0 = center
-
     P0 = camera.transform_3D(u0, v0)
-
     u1 = int(u0 - sigma * np.cos(theta))
     v1 = int(v0 + sigma * np.sin(theta))
     P1 = camera.transform_3D(u1, v1)
-
     e = np.sqrt((P0-P1).dot(P0-P1))
-
     alpha = 1
     return e*alpha
 
-    #  heightmap = im.copy()
+   #  heightmap = im.copy()
    #  im2 = heightmap[:,:,1]
    #  im2 = (im2-np.min(im2))/(np.max(im2)-np.min(im2))
    #  im2 = im2*255

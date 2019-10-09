@@ -123,9 +123,8 @@ class Robot:
                 u, v = self.manual_click(color)
         second_min = div.second_min(depth_img.flatten())
         depth_img[depth_img == 0.] = second_min
-        camera = self.camera.transform_3D(u, v, depth_img, param=camera_param)
+        camera = self.camera.transform_3D(u, v, image=depth_img, param=camera_param)
         camera = camera.reshape(3, 1)
-        print('camera size : {}'.format(camera.shape), camera, np.transpose(camera).shape)
         if cartpos is None:
             cartpos = self.getCart()
         Base_main = self.camera2main(np.transpose(camera), self.Rmain_camera, self.Tmain_camera)
@@ -178,18 +177,20 @@ class Robot:
         self.iiwa.movePTPJointSpace(angular_home, 0.50)
         # self.iiwa.movePTPLineEEF(goto, speed, orientationVel=0.5)
 
-    def grasp(self, pos, ang, speed=50,rotate=False):
+    def grasp(self, pos, ang, speed=50, rotate=False):
         angle = div.angle2robotangle(ang)*np.pi/180
         pos[2] = max(pos[2]-60, self.z_min)
-        pos[0] += 14
-        pos[1] -= 31.7
+        pos[2] -= 5
+
+        pos[0] += 30
+        pos[1] -= 30.7
         print('L angle dans le repère robot : {} \nAngle dans le repère base{}'.format(angle, ang))
         grasp_above = [pos[0], pos[1], pos[2]+100., angle, 0, np.pi]
         print('Grasping à ', grasp_above)
-        self.iiwa.movePTPLineEEF(grasp_above, 4*speed, orientationVel=0.5)
+        self.iiwa.movePTPLineEEF(grasp_above, 8*speed, orientationVel=1)
 
         # self.grip.openGripper()
-        self.grip.goTomm(75)
+        self.grip.goTo(75)
         grasp = [pos[0], pos[1], pos[2], angle, 0, np.pi]
         self.iiwa.movePTPLineEEF(grasp, speed, orientationVel=0.1)
         self.grip.closeGripper()
@@ -202,7 +203,10 @@ class Robot:
         #     self.iiwa.movePTPJointSpace(jpos,0.1)
 
         # self.grip.openGripper()
-        self.grip.goTomm(75)
+        self.iiwa.movePTPLineEEF(grasp_above, 8*speed, orientationVel=1)
+        self.iiwa.movePTPLineEEF([814, -52.5, 283.6, -1.64, -0, -2.36], 8*speed, orientationVel=1)
+        input('Tapez quand vous etes pret a recuperer : ')
+        self.grip.goTo(60)
         self.home()
         return self.grip.isObjectDetected()
 
@@ -215,7 +219,9 @@ if __name__=="__main__":
     rob = Robot()
     # rob.home()
     # pos = [4.93012815e+02, -5.54576652e+00, 2.11998124e+02, angle, 0, np.pi]
-
+    print('Pos', rob.iiwa.getEEFPos())
+    print('PosCart', rob.iiwa.getEEFCartesianPosition())
+    print('PosAngle', rob.iiwa.getEEFCartesianOrientation())
     print('Angle Actuelle : ', rob.iiwa.getEEFPos()[3]*180/np.pi)
     # grasp_above = [, ,  angle, 0, np.pi]
     # angle_commanfe = rob.iiwa.getEEFPos()[3]*180/np.pi

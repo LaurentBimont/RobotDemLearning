@@ -38,7 +38,7 @@ class OnlineAugmentation(object):
 
         x_lim, y_lim, _ = im.shape
         for i in range(0, augmentation_factor**3):
-            xc, yc, angle = int(np.random.random()*x_lim), int(np.random.random()*y_lim), int(360*np.random.random())
+            xc, yc, angle, zoom = int(np.random.random()*x_lim), int(np.random.random()*y_lim), int(360*np.random.random()), (np.random.random()-0.5)/5+1
             bool_add_noise = np.random.random()<0.8
             if bool_add_noise:
                 noisy_square_im = add_noise(np.copy(square_im))

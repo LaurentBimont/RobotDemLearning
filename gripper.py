@@ -344,7 +344,7 @@ class RobotiqGripper(mm.Instrument):
         while loop:
             self.readAll()
             gSTA = self.paramDic["gSTA"]
-            if ((time.time() - timeIni) < self.timeOut):
+            if ((time.time() - timeIni) > self.timeOut):
                 loop = False
                 print("Activation never ended. Time out.")
             elif gSTA == 3:
@@ -363,7 +363,7 @@ class RobotiqGripper(mm.Instrument):
         self.reset()
         # Activate the gripper
         self.activate()
-
+        time.sleep(2.)
         # TO DO: wait for the activation to complete
 
     def _intToHex(self, integer, digits=2):
@@ -562,14 +562,13 @@ if __name__== "__main__":
     grip.reset()
 
     grip.activate()
-
-    while True:
-
-        grip.closeGripper()
-        print(grip.isObjectDetected())
-        time.sleep(2)
-        grip.openGripper()
-
+    grip.openGripper()
+    grip.closeGripper()
+    # while True:
+    #     grip.closeGripper()
+    #     print(grip.isObjectDetected())
+    #     time.sleep(2)
+    #     grip.openGripper()
     # grip.goTo(20)
     # grip.goTo(230)
     # grip.goTo(40)

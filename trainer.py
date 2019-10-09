@@ -39,7 +39,7 @@ class Trainer(object):
         # self.create_log()
         self.exp_rpl = ExperienceReplay(["depth_heightmap", "label", "loss"])
         # Frequency
-        self.viz_frequency = 25
+        self.viz_frequency = 400
         self.saving_frequency = 199
         self.only_second_min = da.OnlineAugmentation()
         # Initiate logger
@@ -100,14 +100,17 @@ class Trainer(object):
             l_numpy[:, :, 0] = l_numpy_pos
             l = tf.convert_to_tensor(l_numpy)
 
+            ### Test Sans poids
             weight = np.abs(output.numpy())
-            weight[l_numpy > 0] += 40/(np.sqrt(np.sum(l_numpy > 0)+1))       #Initialement 2.
-            weight[l_numpy < 0] += 40/(np.sqrt(np.sum(l_numpy < 0)+1))       #Initialement 1.
+            weight[l_numpy > 0] += 20/(np.sqrt(np.sum(l_numpy > 0)+1))       #Initialement 2.
+            weight[l_numpy < 0] += 20/(np.sqrt(np.sum(l_numpy < 0)+1))       #Initialement 1.
             weight[l_numpy == 0] += 1/(np.sqrt(np.sum(l_numpy == 0)+1))      #Initialement 0.2
+
             # print(1/(np.log(np.sum(l_numpy == 0)+2)), 1/(np.log(np.sum(l_numpy > 0)+2)))
             # print('Les poids : ', 1/(np.sum(l_numpy > 0)+1), 1/(np.sum(l_numpy < 0)+1), 1/(np.sum(l_numpy == 0)+1))
 
             lossL2 = tf.add_n([tf.nn.l2_loss(v) for v in self.vars])
+
             self.loss_value = self.loss(l, output, weight) + 0.00005 * lossL2
             # print('Contribution pour chaque classe \n 1 {} \n -1 {} \n 0 {}'.format(10/(np.sum(l_numpy > 0)+1), 10/(np.sum(l_numpy < 0)+1), 1/(np.sum(l_numpy == 0)+1)))
             print('Contribution des loss : Huber ({}) et L2 reg ({})'.format(self.loss(l, output, weight)/self.loss_value,
@@ -256,26 +259,26 @@ class Trainer(object):
 
         for batch in range(len(self.dataset['im'])//batch_size):
             batch_im, batch_label = self.random_batch(batch_size, self.dataset)
-            self.forward(batch_im)
-            # self.compute_loss_dem([batch_label, batch_label, batch_label, batch_label], noBackprop=True)
-            self.compute_loss_dem(batch_label, noBackprop=True)
-            self.exp_rpl.store([batch_im, batch_label, self.loss_value], demo)
+            ## Remove of xp Replay
+            # self.forward(batch_im)
+            # # self.compute_loss_dem([batch_label, batch_label, batch_label, batch_label], noBackprop=True)
+            # self.compute_loss_dem(batch_label, noBackprop=True)
+
+            self.exp_rpl.store([batch_im, batch_label, 0], demo)
             if batch % 20 == 0:
                 print('{}/{}'.format(batch, len(self.dataset['im'])//batch_size))
 
     def main_xpreplay(self, random_param=0.7, nb_epoch=2, batch_size=3, nb_batch=800):
         self.exp_rpl.generate_ranking()
         for epoch in range(nb_epoch):
-
             for batch in range(nb_batch):
-                if batch % 20 == 0:
-                    print('La valeur de perte : {}'.format(self.loss_value.numpy()))
-                    print('Epoch {}/{}, Batch {}/{}'.format(epoch + 1, nb_epoch, batch + 1, nb_batch))
                 batch_im, batch_lab = self.exp_rpl.replay(random_param, batch_size=batch_size)
                 # plt.imshow(batch_im[0, :, :, 0])
                 # plt.show()
                 self.main_batches(batch_im, batch_lab)
-
+                if batch % 20 == 0:
+                    print('La valeur de perte : {}'.format(self.loss_value.numpy()))
+                    print('Epoch {}/{}, Batch {}/{}'.format(epoch + 1, nb_epoch, batch + 1, nb_batch))
                 # On tourne selon 4 angles pour essayer de résoudre le biais d'orientation observé lors des tests
                 sub = 1
 
@@ -359,6 +362,15 @@ class Trainer(object):
         self.checkpoint.save(self.snapshot_file)
 
     def prediction_viz(self, qmap, im):
+        # plt.imshow(im[0, :, :, 0])
+        # plt.show()
+        # print(qmap.shape)
+        # plt.imshow(qmap[:, :, 0], vmin=-1, vmax=1, cmap='RdYlGn')
+        # plt.show()
+        # print(im.shape)
+
+        # plt.imshow(qmap[:, :, 0] * (im[0, :, :, 0] != 0).astype(np.int))
+        # plt.show()
         # Version Tanh
         qmap = (qmap + 1) / 2
         qmap = tf.image.resize_images(qmap, (self.width, self.height))
@@ -366,7 +378,7 @@ class Trainer(object):
 
         qmap = tf.reshape(qmap[:, :, 0], (224, 224))
         # Version Huber Loss
-        # qmap = qmap[0, :, :, :]
+        # qmap = qmap[0, :, :, :]*
         # qmap = tf.image.resize_images(qmap, (self.width, self.height))
         # qmap = tf.image.resize_images(qmap, (224, 224), method=tf.image.ResizeMethod.NEAREST_NEIGHBOR)
         # qmap = tf.reshape(qmap, (224, 224))
