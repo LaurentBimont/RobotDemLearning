@@ -19,7 +19,6 @@ from camera import RealCamera
 # Import de l'argparse
 import argparse
 
-
 def get_pred(trainer, num=None, camera=None, depth=None):
     if (depth is None) and (camera is not None):
         depth_image, _ = camera.get_frame()
@@ -89,7 +88,7 @@ def get_pred(trainer, num=None, camera=None, depth=None):
 
     return x_pred, y_pred, angle_pred, e_pred, depth, out
 
-def demo(nb_demo):
+def demo(nb_demo, camera, FT):
     for i in range(1, nb_demo):
         xp_param = []
         x, y = 0, 0
@@ -124,7 +123,7 @@ def learning(demo_depth_label, trainer):
     trainer.main_online(demo_depth_label, nb_batch=1600)
     return trainer
 
-def grasping(nb_trial):
+def grasping(nb_trial, trainer, camera, iiwa, camera_param):
     x_pred, y_pred, angle_pred, e_pred, depth, out = get_pred(trainer, camera=camera, num=nb_trial)
     print('Parametre du rectangle : ecartement {}, angle {}, x: {}, y: {}, longueur pince {}'.format(e_pred,
                                                                                                         angle_pred,
@@ -148,7 +147,7 @@ def load():
         demo_depth_label.append(np.load(f))
     return demo_depth_label
 
-def action(trainer, Robot, viz=False):
+def action(trainer, Robot, camera, iiwa, camera_param, viz=False):
     '''
     Perform an action decided by a neural network
     :param trainer: Model
@@ -158,7 +157,7 @@ def action(trainer, Robot, viz=False):
         cont = '1'
         nb_attempt = 0
         while cont != '0':
-            grasping(nb_attempt)
+            grasping(nb_attempt, trainer, camera, iiwa, camera_param)
             nb_attempt += 1
             cont = input('Voulez vous continuer ? NON:0')
     else:
@@ -181,7 +180,13 @@ def action(trainer, Robot, viz=False):
     return
 
 def main(args):
-    onRobot, Training, snapshot_file, Demo, nb_demo = False, True, 'Vis_1_Demo_', False, 1
+    onRobot = args.onRobot
+    Training = args.Training
+    snapshot_file = args.snapshot_file
+    print(snapshot_file)
+    Demo = args.Demo
+    nb_demo = args.nb_demo
+    # nb_demo = False, True, 'Vis_1_Demo_', False, 1
     try:
         if Demo or onRobot:
             camera = RealCamera()
@@ -194,7 +199,7 @@ def main(args):
             iiwa.home()
             # Launch demonstration mode and save in Experiences/depth_label
         if Demo:
-            demo(nb_demo)
+            demo(nb_demo, camera, FT)
 
         # Load previous or present demonstration files
         demo_depth_label = load()
@@ -208,8 +213,8 @@ def main(args):
             trainer = Trainer(savetosnapshot=False, load=True, snapshot_file=snapshot_file)
 
         ### If Robot is set to True, Grasping will be executed in real life.
-        # Else, it will use Automated_test files to make predictions.
-        action(trainer, onRobot)
+        # Else, it will use Automated_test files to make a prediction.
+        action(trainer, onRobot, camera, iiwa, camera_param)
         if Demo or onRobot:
             iiwa.iiwa.close()
 
@@ -229,64 +234,17 @@ def main(args):
             iiwa.iiwa.close()
             camera.stop_pipe()
 
-
 if __name__=="__main__":
     onRobot, Training, snapshot_file, Demo, nb_demo = False, True, 'Vis_1_Demo_', False, 1
     # Parse arguments
     parser = argparse.ArgumentParser(
         description='Teach a robot to grasp an object at a precise location from one demonstration')
 
-    # --------------- Setup options ---------------
-    parser.add_argument('--onRobot', dest='onRobot', action='store_true', default=False, help='run in simulation?')
-    parser.add_argument('--obj_mesh_dir', dest='obj_mesh_dir', action='store', default='objects/blocks',
-                        help='directory containing 3D mesh files (.obj) of objects to be added to simulation')
-    parser.add_argument('--num_obj', dest='num_obj', type=int, action='store', default=10,
-                        help='number of objects to add to simulation')
-    parser.add_argument('--tcp_host_ip', dest='tcp_host_ip', action='store', default='100.127.7.223',
-                        help='IP address to robot arm as TCP client (UR5)')
-    parser.add_argument('--tcp_port', dest='tcp_port', type=int, action='store', default=30002,
-                        help='port to robot arm as TCP client (UR5)')
-    parser.add_argument('--rtc_host_ip', dest='rtc_host_ip', action='store', default='100.127.7.223',
-                        help='IP address to robot arm as real-time client (UR5)')
-    parser.add_argument('--rtc_port', dest='rtc_port', type=int, action='store', default=30003,
-                        help='port to robot arm as real-time client (UR5)')
-    parser.add_argument('--heightmap_resolution', dest='heightmap_resolution', type=float, action='store',
-                        default=0.002, help='meters per pixel of heightmap')
-    parser.add_argument('--random_seed', dest='random_seed', type=int, action='store', default=1234,
-                        help='random seed for simulation and neural net initialization')
-    parser.add_argument('--cpu', dest='force_cpu', action='store_true', default=False,
-                        help='force code to run in CPU mode')
-
-    # ------------- Algorithm options -------------
-    parser.add_argument('--method', dest='method', action='store', default='reinforcement',
-                        help='set to \'reactive\' (supervised learning) or \'reinforcement\' (reinforcement learning ie Q-learning)')
-    parser.add_argument('--push_rewards', dest='push_rewards', action='store_true', default=False,
-                        help='use immediate rewards (from change detection) for pushing?')
-    parser.add_argument('--future_reward_discount', dest='future_reward_discount', type=float, action='store',
-                        default=0.5)
-    parser.add_argument('--experience_replay', dest='experience_replay', action='store_true', default=False,
-                        help='use prioritized experience replay?')
-    parser.add_argument('--heuristic_bootstrap', dest='heuristic_bootstrap', action='store_true', default=False,
-                        help='use handcrafted grasping algorithm when grasping fails too many times in a row during training?')
-    parser.add_argument('--explore_rate_decay', dest='explore_rate_decay', action='store_true', default=False)
-    parser.add_argument('--grasp_only', dest='grasp_only', action='store_true', default=False)
-
-    # -------------- Testing options --------------
-    parser.add_argument('--is_testing', dest='is_testing', action='store_true', default=False)
-    parser.add_argument('--max_test_trials', dest='max_test_trials', type=int, action='store', default=30,
-                        help='maximum number of test runs per case/scenario')
-    parser.add_argument('--test_preset_cases', dest='test_preset_cases', action='store_true', default=False)
-    parser.add_argument('--test_preset_file', dest='test_preset_file', action='store', default='test-10-obj-01.txt')
-
-    # ------ Pre-loading and logging options ------
-    parser.add_argument('--load_snapshot', dest='load_snapshot', action='store_true', default=False,
-                        help='load pre-trained snapshot of model?')
-    parser.add_argument('--snapshot_file', dest='snapshot_file', action='store')
-    parser.add_argument('--continue_logging', dest='continue_logging', action='store_true', default=False,
-                        help='continue logging from previous session?')
-    parser.add_argument('--logging_directory', dest='logging_directory', action='store')
-    parser.add_argument('--save_visualizations', dest='save_visualizations', action='store_true', default=False,
-                        help='save visualizations of FCN predictions?')
+    parser.add_argument('--onRobot', dest='onRobot', action='store_true', default=True, help='run in simulation?')
+    parser.add_argument('--Training', dest='Training', action='store_true', default=False, help='Train the model again ? is set to False, the last model will be loaded')
+    parser.add_argument('--snapshot_file', dest='snapshot_file', action='store', default='default_snapshot_name' ,help='Name of the snapshot file where model will be save')
+    parser.add_argument('--Demo', dest='Demo', action='store_true', default=False, help='Perform a demonstration')
+    parser.add_argument('--nb_demo', dest='nb_demo', type=int, action='store', default=1, help='number of demonstrations to perform')
 
     # Run main program with specified arguments
     args = parser.parse_args()

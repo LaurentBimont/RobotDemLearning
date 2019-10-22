@@ -9,7 +9,6 @@ config = tf.ConfigProto()
 config.gpu_options.allow_growth = True
 tf.enable_eager_execution(config)
 
-import rewardManager as RM
 import functools as func
 import numpy as np
 import matplotlib.pyplot as plt
@@ -20,7 +19,6 @@ import dataAugmentation as da
 import tfmpl                             # Put matplotlib figures in tensorboard
 import os
 from skimage.transform import resize
-from experienceReplay import ExperienceReplay
 
 class Trainer(object):
     def __init__(self, savetosnapshot=True, load=False, snapshot_file='name'):
